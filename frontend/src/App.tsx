@@ -1,5 +1,21 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
+import {
+  Alert,
+  Anchor,
+  Badge,
+  Button,
+  Card,
+  Container,
+  Grid,
+  Group,
+  Loader,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core'
+import { IconAlertCircle } from '@tabler/icons-react'
 import { createJob, subscribeJob, JobStage, getJob } from './api'
 
 interface ProgressEvent {
@@ -130,49 +146,91 @@ export default function App() {
   const stageMap = useMemo(() => Object.fromEntries(stages.map((s) => [s.key, s.label])), [])
 
   return (
-    <main style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
-      <form onSubmit={startJob} style={{ display: 'flex', gap: 12 }}>
-        <input
-          type="url"
-          placeholder="输入 bilibili 视频链接"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          style={{ flex: 1, padding: 10, fontSize: 16 }}
-          required
-        />
-        <button type="submit" style={{ padding: '10px 16px' }}>
-          开始
-        </button>
-      </form>
+    <Container size="lg" py="md">
+      <Card withBorder shadow="xs" padding="lg" radius="md">
+        <form onSubmit={startJob}>
+          <Stack gap="sm">
+            <Group justify="space-between" align="flex-end">
+              <Title order={3}>Bilibili 文字转录</Title>
+              <Badge color="blue" variant="light">
+                gpt-4o-mini-transcribe + DeepSeek
+              </Badge>
+            </Group>
+            <Anchor size="sm" component={Link} to="/history" c="blue.6">
+              查看历史记录
+            </Anchor>
+            <TextInput
+              type="url"
+              label="视频链接"
+              placeholder="输入 bilibili 视频链接"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              required
+            />
+            <Group justify="flex-end">
+              <Button type="submit">开始</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Card>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && (
+        <Alert icon={<IconAlertCircle size={16} />} color="red" mt="md">
+          {error}
+        </Alert>
+      )}
 
       {jobId && (
-        <section style={{ marginTop: 20 }}>
-          <h3>任务 ID: {jobId}</h3>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-            {stages.map((s) => (
-              <span key={s.key} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                <StageBadge active={stage === s.key || stage === 'done'} />
-                {s.label}
-              </span>
-            ))}
-          </div>
-          <p>当前阶段: {stageMap[stage as JobStage] || stage}</p>
-          <p>已处理字数: {wordCount}</p>
+        <Card withBorder shadow="xs" mt="md" padding="lg" radius="md">
+          <Stack gap="sm">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  任务 ID
+                </Text>
+                <Text fw={600}>{jobId}</Text>
+              </div>
+              <Group gap="xs">
+                {stages.map((s) => (
+                  <Badge key={s.key} color={stage === s.key ? 'blue' : 'gray'} variant={stage === s.key ? 'filled' : 'light'}>
+                    {s.label}
+                  </Badge>
+                ))}
+              </Group>
+            </Group>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <h4>原始转录</h4>
-              <pre style={{ whiteSpace: 'pre-wrap', background: '#f7f7f7', padding: 12, minHeight: 200 }}>{raw}</pre>
-            </div>
-            <div>
-              <h4>整理后文本</h4>
-              <pre style={{ whiteSpace: 'pre-wrap', background: '#f0f7ff', padding: 12, minHeight: 200 }}>{formatted}</pre>
-            </div>
-          </div>
-        </section>
+            <Group gap="md">
+              <Text>当前阶段：{stageMap[stage as JobStage] || stage}</Text>
+              <Text c="dimmed">已处理字数：{wordCount}</Text>
+            </Group>
+
+            <Grid gutter="md">
+              <Grid.Col span={6}>
+                <Card padding="md" radius="sm" withBorder>
+                  <Group gap={6} mb="xs">
+                    <Title order={5}>原始转录</Title>
+                    {stage === 'transcribing' && <Loader size="sm" />}
+                  </Group>
+                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                    {raw || '（等待转录中...）'}
+                  </Text>
+                </Card>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Card padding="md" radius="sm" withBorder>
+                  <Group gap={6} mb="xs">
+                    <Title order={5}>整理后文本</Title>
+                    {stage === 'formatting' && <Loader size="sm" />}
+                  </Group>
+                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                    {formatted || '（等待整理中...）'}
+                  </Text>
+                </Card>
+              </Grid.Col>
+            </Grid>
+          </Stack>
+        </Card>
       )}
-    </main>
+    </Container>
   )
 }

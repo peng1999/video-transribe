@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { listJobs } from '../api'
 import { Link } from 'react-router-dom'
+import { Card, Container, Group, Stack, Text, Title, Anchor, Badge } from '@mantine/core'
 
 export default function History() {
   const { data, isLoading, error } = useQuery({ queryKey: ['jobs'], queryFn: listJobs })
@@ -9,18 +10,35 @@ export default function History() {
   if (error) return <p>加载失败</p>
 
   return (
-    <main style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
-      <h3>历史记录</h3>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
+    <Container size="lg" py="md">
+      <Title order={3} mb="md">
+        历史记录
+      </Title>
+      <Stack gap="sm">
         {data?.map((job) => (
-          <li key={job.id} style={{ padding: '8px 0', borderBottom: '1px solid #eee' }}>
-            <strong>{job.status}</strong> · {job.url}
-            <div style={{ fontSize: 12, color: '#555' }}>创建时间: {new Date(job.created_at).toLocaleString()}</div>
-            {job.formatted_text && <p style={{ margin: '6px 0', color: '#222' }}>{job.formatted_text.slice(0, 120)}...</p>}
-            <Link to={`/?job=${job.id}`}>查看</Link>
-          </li>
+          <Card withBorder padding="md" radius="md" key={job.id}>
+            <Group justify="space-between" align="flex-start" mb="xs">
+              <div>
+                <Text fw={600}>{job.url}</Text>
+                <Text size="sm" c="dimmed">
+                  创建时间：{new Date(job.created_at).toLocaleString()}
+                </Text>
+              </div>
+              <Badge color={job.status === 'done' ? 'green' : job.status === 'error' ? 'red' : 'blue'}>
+                {job.status}
+              </Badge>
+            </Group>
+            {job.formatted_text && (
+              <Text size="sm" c="dimmed" mb="xs">
+                {job.formatted_text.slice(0, 120)}...
+              </Text>
+            )}
+            <Anchor component={Link} to={`/?job=${job.id}`} size="sm">
+              查看
+            </Anchor>
+          </Card>
         ))}
-      </ul>
-    </main>
+      </Stack>
+    </Container>
   )
 }

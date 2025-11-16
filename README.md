@@ -54,3 +54,4 @@ Vite dev server 通过代理将 `/api` 指向 `http://localhost:8000`，WebSocke
 
 # TODO
 - 在前端的首页界面，如果当前的任务失败了，立刻显示错误信息，如同 /?job 界面点进去看到的错误信息一样
+- 添加鉴权功能

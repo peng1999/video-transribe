@@ -102,7 +102,7 @@ async def download_audio(url: str, target_base: Path) -> Path:
     def _download():
         ydl_opts = {
             "extract_audio": True,
-            "format": "bestaudio/best",
+            "format": "worstaudio/worst",
             "outtmpl": f"{target_base}.%(ext)s",  # ensure extension placeholder
             "final_ext": "mp3",
             "quiet": True,
@@ -165,24 +165,18 @@ async def stream_transcription(audio_path: Path, job_id: str) -> str:
             stream=True,
         )
         async for event in stream:
-            logging.info(f"Transcription event: {event}")
             # events documented as transcript.text.delta / .done
-            event_type = getattr(event, "type", None) or event.get("type", None)
-            if event_type and "delta" in event_type:
-                delta = getattr(event, "text", None) or getattr(event, "delta", None) or event.get("text") or event.get("delta")
-                if delta:
-                    accumulated.append(delta)
-                    word_count = len("".join(accumulated).split())
-                    broadcast(job_id, {"stage": JobStatus.transcribing, "words": word_count, "chunk": delta})
-            elif event_type and "done" in event_type:
-                text = getattr(event, "text", None) or event.get("text")
-                if text:
-                    accumulated = [text]
-            # fallback: if event has 'text'
-            elif hasattr(event, "text"):
-                accumulated.append(event.text)
+            if "delta" in event.type:
+                delta = event.delta
+                accumulated.append(delta)
                 word_count = len("".join(accumulated).split())
-                broadcast(job_id, {"stage": JobStatus.transcribing, "words": word_count, "chunk": event.text})
+                broadcast(job_id, {"stage": JobStatus.transcribing, "words": word_count, "chunk": delta})
+            elif "done" in event.type:
+                text = event.text
+                logging.info(f"Transcription done event received, input_tokens={event.usage.input_tokens}, output_tokens={event.usage.output_tokens}")
+                accumulated = [text]
+                # send final full text to front-end to avoid partial leftovers
+                broadcast(job_id, {"stage": JobStatus.transcribing, "words": len(text.split()), "raw_text": text})
 
     return "".join(accumulated)
 
