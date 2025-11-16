@@ -1,11 +1,12 @@
 import asyncio
+import hashlib
 import os
+import shutil
 import tempfile
 import uuid
 from pathlib import Path
 from typing import Callable, Dict, List
 
-import httpx
 import yt_dlp
 from sqlalchemy.orm import Session
 
@@ -53,37 +54,50 @@ async def _run(job: Job, url: str, db: Session):
     db.commit()
     broadcast(job.id, {"stage": JobStatus.downloading, "message": "Downloading audio"})
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        audio_path = Path(tmpdir) / f"{job.id}.mp3"
-        await download_audio(url, audio_path)
+    cache_path = get_cache_path(url)
 
-        job.status = JobStatus.transcribing
-        db.commit()
-        broadcast(job.id, {"stage": JobStatus.transcribing, "message": "Transcribing"})
+    if cache_path.exists():
+        audio_path = cache_path
+        broadcast(job.id, {"stage": JobStatus.downloading, "message": "Cache hit, reuse audio"})
+    else:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target_base = Path(tmpdir) / f"{job.id}"
+            downloaded = await download_audio(url, target_base)
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(downloaded, cache_path)
+            audio_path = cache_path
 
-        raw_text = await stream_transcription(audio_path, job.id)
-        job.raw_text = raw_text
+    if not audio_path.exists():
+        raise FileNotFoundError(f"Audio file missing: {audio_path}")
 
-        job.status = JobStatus.formatting
-        db.commit()
-        broadcast(job.id, {"stage": JobStatus.formatting, "message": "Formatting"})
+    job.status = JobStatus.transcribing
+    db.commit()
+    broadcast(job.id, {"stage": JobStatus.transcribing, "message": "Transcribing"})
 
-        formatted = await stream_formatting(raw_text, job.id)
-        job.formatted_text = formatted
+    raw_text = await stream_transcription(audio_path, job.id)
+    job.raw_text = raw_text
 
-        job.status = JobStatus.done
-        db.commit()
-        broadcast(job.id, {"stage": JobStatus.done, "message": "Done"})
+    job.status = JobStatus.formatting
+    db.commit()
+    broadcast(job.id, {"stage": JobStatus.formatting, "message": "Formatting"})
+
+    formatted = await stream_formatting(raw_text, job.id)
+    job.formatted_text = formatted
+
+    job.status = JobStatus.done
+    db.commit()
+    broadcast(job.id, {"stage": JobStatus.done, "message": "Done"})
 
 
-async def download_audio(url: str, target: Path):
+async def download_audio(url: str, target_base: Path) -> Path:
     loop = asyncio.get_event_loop()
 
     def _download():
         ydl_opts = {
             "extract_audio": True,
             "format": "bestaudio/best",
-            "outtmpl": str(target),
+            "outtmpl": f"{target_base}.%(ext)s",  # ensure extension placeholder
+            "final_ext": "mp3",
             "quiet": True,
             "postprocessors": [
                 {
@@ -97,6 +111,37 @@ async def download_audio(url: str, target: Path):
             ydl.download([url])
 
     await loop.run_in_executor(None, _download)
+
+    candidate = find_audio_file(target_base)
+    if candidate:
+        return candidate
+
+    raise FileNotFoundError(f"Audio file not found after download in {target_base.parent}")
+
+
+def find_audio_file(target_base: Path) -> Path | None:
+    # first try exact stem with common audio extensions
+    exts = [".mp3", ".m4a", ".aac", ".opus", ".webm", ".wav", ".flac"]
+    for ext in exts:
+        p = target_base.with_suffix(ext)
+        if p.exists():
+            return p
+    # fallback: newest audio-like file in directory
+    audio_glob = list(target_base.parent.glob("*.*"))
+    audio_sorted = sorted(
+        [p for p in audio_glob if p.suffix.lower() in exts],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if audio_sorted:
+        return audio_sorted[0]
+    return None
+
+
+def get_cache_path(url: str) -> Path:
+    cache_dir = Path(os.getenv("AUDIO_CACHE_DIR", "./cache"))
+    hashed = hashlib.sha256(url.encode()).hexdigest()[:32]
+    return cache_dir / f"{hashed}.mp3"
 
 
 async def stream_transcription(audio_path: Path, job_id: str) -> str:

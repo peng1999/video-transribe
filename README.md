@@ -50,3 +50,7 @@ Vite dev server 通过代理将 `/api` 指向 `http://localhost:8000`，WebSocke
 - 仅允许 bilibili.com 链接。
 - Whisper 文件大小上限 25MB；如需更大，先裁剪或降低音质。
 - 临时文件在任务结束后会删除。
+- 已下载的音频会按 URL 哈希缓存在 `backend/cache/`，重复请求相同 URL 会复用；可通过 `AUDIO_CACHE_DIR` 自定义位置。
+
+# TODO
+- 在前端的首页界面，如果当前的任务失败了，立刻显示错误信息，如同 /?job 界面点进去看到的错误信息一样

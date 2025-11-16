@@ -10,7 +10,6 @@ dependencies = [
     "sqlalchemy",
     "pydantic",
     "python-dotenv",
-    "httpx",
     "yt-dlp",
     "openai>=1.56.0",
     "python-multipart",

@@ -41,7 +41,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
-    { name = "httpx" },
     { name = "openai" },
     { name = "pydantic" },
     { name = "python-dotenv" },
@@ -54,7 +53,6 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi" },
-    { name = "httpx" },
     { name = "openai", specifier = ">=1.56.0" },
     { name = "pydantic" },
     { name = "python-dotenv" },
