@@ -10,7 +10,6 @@ from .db import Base, engine, get_db
 from .models import Job, JobStatus
 from .schemas import CreateJobRequest, JobResponse, JobsResponse
 from .worker import (
-    broadcast,
     create_job_record,
     enqueue_job,
     register_queue,

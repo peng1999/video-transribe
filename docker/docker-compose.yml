@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+      target: backend
+    env_file:
+      - ../backend/.env
+    volumes:
+      - backend_cache:/app/backend/cache
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+      target: frontend-nginx
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  backend_cache:
