@@ -178,4 +178,5 @@ def create_job_record(url: str, db: Session) -> Job:
 
 
 def enqueue_job(job: Job):
-    asyncio.create_task(run_job(job.id, job.url, SessionLocal))
+    loop = asyncio.get_event_loop()
+    loop.create_task(run_job(job.id, job.url, SessionLocal))

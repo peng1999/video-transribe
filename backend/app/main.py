@@ -26,7 +26,7 @@ app.add_middleware(
 
 
 @app.post("/jobs", response_model=JobResponse)
-def create_job(body: CreateJobRequest, db: Session = Depends(get_db)):
+async def create_job(body: CreateJobRequest, db: Session = Depends(get_db)):
     if "bilibili.com" not in body.url.host:
         raise HTTPException(status_code=400, detail="仅允许 bilibili 链接")
 

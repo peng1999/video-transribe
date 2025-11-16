@@ -3,7 +3,7 @@ name = "bilibili-transcriber-backend"
 version = "0.1.0"
 description = "FastAPI backend for Bilibili audio transcription"
 readme = "README.md"
-requires-python = ">=3.10" # TODO: Upgrade to Python 3.14
+requires-python = ">=3.10" # TODO: Upgrade to Python 3.13
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
