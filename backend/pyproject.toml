@@ -19,3 +19,12 @@ dependencies = [
 
 [tool.uv]
 package = true
+
+[tool.setuptools]
+packages = ["app"]
+
+[dependency-groups]
+dev = [
+    "black>=25.11.0",
+    "ruff>=0.14.5",
+]

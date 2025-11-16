@@ -60,7 +60,10 @@ async def _run(job: Job, url: str, db: Session):
 
     if cache_path.exists():
         audio_path = cache_path
-        broadcast(job.id, {"stage": JobStatus.downloading, "message": "Cache hit, reuse audio"})
+        broadcast(
+            job.id,
+            {"stage": JobStatus.downloading, "message": "Cache hit, reuse audio"},
+        )
         logging.info("job %s cache hit %s", job.id, audio_path)
     else:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -123,7 +126,9 @@ async def download_audio(url: str, target_base: Path) -> Path:
     if candidate:
         return candidate
 
-    raise FileNotFoundError(f"Audio file not found after download in {target_base.parent}")
+    raise FileNotFoundError(
+        f"Audio file not found after download in {target_base.parent}"
+    )
 
 
 def find_audio_file(target_base: Path) -> Path | None:
@@ -170,13 +175,29 @@ async def stream_transcription(audio_path: Path, job_id: str) -> str:
                 delta = event.delta
                 accumulated.append(delta)
                 word_count = len("".join(accumulated).split())
-                broadcast(job_id, {"stage": JobStatus.transcribing, "words": word_count, "chunk": delta})
+                broadcast(
+                    job_id,
+                    {
+                        "stage": JobStatus.transcribing,
+                        "words": word_count,
+                        "chunk": delta,
+                    },
+                )
             elif "done" in event.type:
                 text = event.text
-                logging.info(f"Transcription done event received, input_tokens={event.usage.input_tokens}, output_tokens={event.usage.output_tokens}")
+                logging.info(
+                    f"Transcription done event received, input_tokens={event.usage.input_tokens}, output_tokens={event.usage.output_tokens}"
+                )
                 accumulated = [text]
                 # send final full text to front-end to avoid partial leftovers
-                broadcast(job_id, {"stage": JobStatus.transcribing, "words": len(text.split()), "raw_text": text})
+                broadcast(
+                    job_id,
+                    {
+                        "stage": JobStatus.transcribing,
+                        "words": len(text.split()),
+                        "raw_text": text,
+                    },
+                )
 
     return "".join(accumulated)
 
@@ -212,7 +233,10 @@ async def stream_formatting(raw_text: str, job_id: str) -> str:
         if delta:
             chunks.append(delta)
             token_count += len(delta.split())
-            broadcast(job_id, {"stage": JobStatus.formatting, "words": token_count, "chunk": delta})
+            broadcast(
+                job_id,
+                {"stage": JobStatus.formatting, "words": token_count, "chunk": delta},
+            )
     return "".join(chunks)
 
 

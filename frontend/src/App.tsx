@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams, Link } from "react-router-dom";
 import {
   Alert,
   Anchor,
@@ -14,136 +14,141 @@ import {
   Text,
   TextInput,
   Title,
-} from '@mantine/core'
-import { IconAlertCircle } from '@tabler/icons-react'
-import { createJob, subscribeJob, JobStage, getJob } from './api'
+} from "@mantine/core";
+import { IconAlertCircle } from "@tabler/icons-react";
+import { createJob, subscribeJob, JobStage, getJob } from "./api";
 
 interface ProgressEvent {
-  stage?: JobStage
-  message?: string
-  words?: number
-  chunk?: string
-  raw_text?: string
-  formatted_text?: string
-  error?: string
+  stage?: JobStage;
+  message?: string;
+  words?: number;
+  chunk?: string;
+  raw_text?: string;
+  formatted_text?: string;
+  error?: string;
 }
 
 type DisplayStage = {
-  label: string
-  key: JobStage
-}
+  label: string;
+  key: JobStage;
+};
 
 const stages: DisplayStage[] = [
-  { key: 'downloading', label: '下载音频' },
-  { key: 'transcribing', label: '转录中' },
-  { key: 'formatting', label: '整理中' },
-  { key: 'done', label: '完成' },
-  { key: 'error', label: '失败' },
-]
+  { key: "downloading", label: "下载音频" },
+  { key: "transcribing", label: "转录中" },
+  { key: "formatting", label: "整理中" },
+  { key: "done", label: "完成" },
+  { key: "error", label: "失败" },
+];
 
 function StageBadge({ active }: { active: boolean }) {
   return (
     <span
       style={{
-        display: 'inline-block',
+        display: "inline-block",
         width: 10,
         height: 10,
-        borderRadius: '50%',
-        background: active ? '#4caf50' : '#ccc',
+        borderRadius: "50%",
+        background: active ? "#4caf50" : "#ccc",
         marginRight: 6,
       }}
     ></span>
-  )
+  );
 }
 
 export default function App() {
-  const [url, setUrl] = useState('')
-  const [jobId, setJobId] = useState<string | null>(null)
-  const [stage, setStage] = useState<JobStage | 'pending'>('pending')
-  const [wordCount, setWordCount] = useState(0)
-  const [formatted, setFormatted] = useState('')
-  const [raw, setRaw] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const wsRef = useRef<WebSocket | null>(null)
-  const stageRef = useRef<JobStage | 'pending'>('pending')
-  const [searchParams] = useSearchParams()
+  const [url, setUrl] = useState("");
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [stage, setStage] = useState<JobStage | "pending">("pending");
+  const [wordCount, setWordCount] = useState(0);
+  const [formatted, setFormatted] = useState("");
+  const [raw, setRaw] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const stageRef = useRef<JobStage | "pending">("pending");
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     return () => {
-      wsRef.current?.close()
-    }
-  }, [])
+      wsRef.current?.close();
+    };
+  }, []);
 
   const resetView = () => {
-    setError(null)
-    setFormatted('')
-    setRaw('')
-    setWordCount(0)
-  }
+    setError(null);
+    setFormatted("");
+    setRaw("");
+    setWordCount(0);
+  };
 
   const handleStreamMessage = (payload: ProgressEvent) => {
     if (payload.stage) {
-      setStage(payload.stage)
-      stageRef.current = payload.stage
+      setStage(payload.stage);
+      stageRef.current = payload.stage;
     }
-    const currentStage = payload.stage ?? stageRef.current
-    if (payload.words !== undefined) setWordCount(payload.words)
-    if (payload.chunk && currentStage === 'transcribing') setRaw((prev) => prev + payload.chunk)
-    if (payload.chunk && currentStage === 'formatting') setFormatted((prev) => prev + payload.chunk)
-    if (payload.raw_text) setRaw(payload.raw_text)
-    if (payload.formatted_text) setFormatted(payload.formatted_text)
-    if (payload.error) setError(payload.error)
-  }
+    const currentStage = payload.stage ?? stageRef.current;
+    if (payload.words !== undefined) setWordCount(payload.words);
+    if (payload.chunk && currentStage === "transcribing")
+      setRaw((prev) => prev + payload.chunk);
+    if (payload.chunk && currentStage === "formatting")
+      setFormatted((prev) => prev + payload.chunk);
+    if (payload.raw_text) setRaw(payload.raw_text);
+    if (payload.formatted_text) setFormatted(payload.formatted_text);
+    if (payload.error) setError(payload.error);
+  };
 
   const connectWebSocket = (id: string) => {
-    wsRef.current?.close()
-    const ws = subscribeJob(id, handleStreamMessage)
-    wsRef.current = ws
-  }
+    wsRef.current?.close();
+    const ws = subscribeJob(id, handleStreamMessage);
+    wsRef.current = ws;
+  };
 
   const startJob = async (e: FormEvent) => {
-    e.preventDefault()
-    resetView()
+    e.preventDefault();
+    resetView();
     try {
-      const job = await createJob(url)
-      setJobId(job.id)
-      setStage('downloading')
-      stageRef.current = 'downloading'
-      connectWebSocket(job.id)
+      const job = await createJob(url);
+      setJobId(job.id);
+      setStage("downloading");
+      stageRef.current = "downloading";
+      connectWebSocket(job.id);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || '创建任务失败')
+      setError(err?.response?.data?.detail || "创建任务失败");
     }
-  }
+  };
 
   const loadJobFromQuery = async (id: string) => {
-    resetView()
-    setJobId(id)
+    resetView();
+    setJobId(id);
     try {
-      const job = await getJob(id)
-      setStage(job.status)
-      stageRef.current = job.status
-      setRaw(job.raw_text || '')
-      setFormatted(job.formatted_text || '')
-      const baseText = job.formatted_text || job.raw_text || ''
-      setWordCount(baseText ? baseText.split(/\s+/).filter(Boolean).length : 0)
-      if (job.error) setError(job.error)
-      if (job.status !== 'done' && job.status !== 'error') {
-        connectWebSocket(id)
+      const job = await getJob(id);
+      setStage(job.status);
+      stageRef.current = job.status;
+      setRaw(job.raw_text || "");
+      setFormatted(job.formatted_text || "");
+      const baseText = job.formatted_text || job.raw_text || "";
+      setWordCount(baseText ? baseText.split(/\s+/).filter(Boolean).length : 0);
+      if (job.error) setError(job.error);
+      if (job.status !== "done" && job.status !== "error") {
+        connectWebSocket(id);
       }
     } catch (err) {
-      setError('任务不存在或获取失败')
+      setError("任务不存在或获取失败");
     }
-  }
+  };
 
   useEffect(() => {
-    const q = searchParams.get('job')
+    const q = searchParams.get("job");
     if (q) {
-      loadJobFromQuery(q)
+      loadJobFromQuery(q);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }, [searchParams]);
 
-  const stageMap = useMemo(() => Object.fromEntries(stages.map((s) => [s.key, s.label])), [])
+  const stageMap = useMemo(
+    () => Object.fromEntries(stages.map((s) => [s.key, s.label])),
+    []
+  );
 
   return (
     <Container size="lg" py="md">
@@ -192,7 +197,11 @@ export default function App() {
               </div>
               <Group gap="xs">
                 {stages.map((s) => (
-                  <Badge key={s.key} color={stage === s.key ? 'blue' : 'gray'} variant={stage === s.key ? 'filled' : 'light'}>
+                  <Badge
+                    key={s.key}
+                    color={stage === s.key ? "blue" : "gray"}
+                    variant={stage === s.key ? "filled" : "light"}
+                  >
                     {s.label}
                   </Badge>
                 ))}
@@ -209,10 +218,10 @@ export default function App() {
                 <Card padding="md" radius="sm" withBorder>
                   <Group gap={6} mb="xs">
                     <Title order={5}>原始转录</Title>
-                    {stage === 'transcribing' && <Loader size="sm" />}
+                    {stage === "transcribing" && <Loader size="sm" />}
                   </Group>
-                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                    {raw || '（等待转录中...）'}
+                  <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                    {raw || "（等待转录中...）"}
                   </Text>
                 </Card>
               </Grid.Col>
@@ -220,10 +229,10 @@ export default function App() {
                 <Card padding="md" radius="sm" withBorder>
                   <Group gap={6} mb="xs">
                     <Title order={5}>整理后文本</Title>
-                    {stage === 'formatting' && <Loader size="sm" />}
+                    {stage === "formatting" && <Loader size="sm" />}
                   </Group>
-                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                    {formatted || '（等待整理中...）'}
+                  <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                    {formatted || "（等待整理中...）"}
                   </Text>
                 </Card>
               </Grid.Col>
@@ -232,5 +241,5 @@ export default function App() {
         </Card>
       )}
     </Container>
-  )
+  );
 }

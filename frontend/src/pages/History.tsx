@@ -1,13 +1,25 @@
-import { useQuery } from '@tanstack/react-query'
-import { listJobs } from '../api'
-import { Link } from 'react-router-dom'
-import { Card, Container, Group, Stack, Text, Title, Anchor, Badge } from '@mantine/core'
+import { useQuery } from "@tanstack/react-query";
+import { listJobs } from "../api";
+import { Link } from "react-router-dom";
+import {
+  Card,
+  Container,
+  Group,
+  Stack,
+  Text,
+  Title,
+  Anchor,
+  Badge,
+} from "@mantine/core";
 
 export default function History() {
-  const { data, isLoading, error } = useQuery({ queryKey: ['jobs'], queryFn: listJobs })
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["jobs"],
+    queryFn: listJobs,
+  });
 
-  if (isLoading) return <p>加载中...</p>
-  if (error) return <p>加载失败</p>
+  if (isLoading) return <p>加载中...</p>;
+  if (error) return <p>加载失败</p>;
 
   return (
     <Container size="lg" py="md">
@@ -24,7 +36,15 @@ export default function History() {
                   创建时间：{new Date(job.created_at).toLocaleString()}
                 </Text>
               </div>
-              <Badge color={job.status === 'done' ? 'green' : job.status === 'error' ? 'red' : 'blue'}>
+              <Badge
+                color={
+                  job.status === "done"
+                    ? "green"
+                    : job.status === "error"
+                    ? "red"
+                    : "blue"
+                }
+              >
                 {job.status}
               </Badge>
             </Group>
@@ -40,5 +60,5 @@ export default function History() {
         ))}
       </Stack>
     </Container>
-  )
+  );
 }

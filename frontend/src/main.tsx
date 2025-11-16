@@ -1,15 +1,15 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
-import { MantineProvider, AppShell, Group, Anchor } from '@mantine/core'
-import '@mantine/core/styles.css'
-import App from './App'
-import History from './pages/History'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { MantineProvider, AppShell, Group, Anchor } from "@mantine/core";
+import "@mantine/core/styles.css";
+import App from "./App";
+import History from "./pages/History";
 
-const client = new QueryClient()
+const client = new QueryClient();
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={client}>
       <MantineProvider defaultColorScheme="light">
@@ -17,7 +17,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <AppShell
             header={{ height: 60 }}
             padding="md"
-            styles={{ body: { backgroundColor: '#f8f9fa' } }}
+            styles={{ body: { backgroundColor: "#f8f9fa" } }}
             headerRenderer={() => (
               <AppShell.Header>
                 <Group h="100%" px="md">
@@ -42,4 +42,4 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       </MantineProvider>
     </QueryClientProvider>
   </React.StrictMode>
-)
+);

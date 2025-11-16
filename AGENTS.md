@@ -11,10 +11,12 @@
 - Backend (from `backend/`):
   - `uv sync` — install deps into `.venv` (uses `pyproject.toml`).
   - `uv run uvicorn app.main:app --reload --port 8000` — run API with auto-reload via uv-managed venv.
+  - `uv run black app` / `uv run ruff format app` — Python 格式化。
 - Frontend (from `frontend/`):
   - `npm install` — install JS deps.
   - `npm run dev -- --host` — start Vite dev server with API proxy.
   - `npm run build` — production build to `dist/`.
+  - `npx prettier@2.8.8 --write "src/**/*.{ts,tsx}"` — 前端格式化（兼容 Node 12）。
 
 ## Coding Style & Naming Conventions
 - Python: keep functions small; prefer `async` for IO paths; follow PEP8 (4-space indent). Use clear stage names matching `JobStatus` enum.
