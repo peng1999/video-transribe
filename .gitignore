@@ -1,0 +1,16 @@
+# python
+__pycache__
+*.pyc
+.env
+.venv
+env/
+
+# node
+node_modules
+*.log
+frontend/dist
+
+# data
+*.db
+*.sqlite
+backend/data.db
