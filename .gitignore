@@ -14,3 +14,6 @@ frontend/dist
 *.db
 *.sqlite
 backend/data.db
+backend/*.egg-info
+backend/.venv
+backend/.uv

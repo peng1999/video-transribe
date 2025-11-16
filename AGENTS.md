@@ -2,16 +2,15 @@
 
 ## Project Structure & Module Organization
 - `backend/app/` — FastAPI code (`main.py`, `worker.py`, `models.py`, `schemas.py`, `db.py`).
-- `backend/requirements.txt` — backend Python dependencies.
+- `backend/pyproject.toml` / `uv.lock` — uv-managed backend dependencies; `.venv` created by `uv sync`.
 - `frontend/` — React + Vite app (`src/` components, pages, API helper). Build output lives in `frontend/dist`.
 - `.env.example` — sample backend configuration; copy to `backend/.env` with real keys.
 - `README.md` — quickstart; read alongside this guide.
 
 ## Build, Test, and Development Commands
 - Backend (from `backend/`):
-  - `python -m venv .venv && source .venv/bin/activate` — create/activate venv.
-  - `pip install -r requirements.txt` — install dependencies.
-  - `uvicorn app.main:app --reload --port 8000` — run API with auto-reload.
+  - `uv sync` — install deps into `.venv` (uses `pyproject.toml`).
+  - `uv run uvicorn app.main:app --reload --port 8000` — run API with auto-reload via uv-managed venv.
 - Frontend (from `frontend/`):
   - `npm install` — install JS deps.
   - `npm run dev -- --host` — start Vite dev server with API proxy.

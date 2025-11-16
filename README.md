@@ -16,14 +16,15 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 ```
 
-## 后端运行
+## 后端运行（uv）
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+# 安装依赖并生成 .venv
+uv sync
+# 运行开发服务
+uv run uvicorn app.main:app --reload --port 8000
 ```
+> 若 `uv` 不在 PATH，可用 `/home/linuxbrew/.linuxbrew/bin/uv` 调用。
 
 ## 前端运行
 ```bash

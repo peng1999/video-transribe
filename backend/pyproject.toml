@@ -1,0 +1,22 @@
+[project]
+name = "bilibili-transcriber-backend"
+version = "0.1.0"
+description = "FastAPI backend for Bilibili audio transcription"
+readme = "README.md"
+requires-python = ">=3.10" # TODO: Upgrade to Python 3.14
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "pydantic",
+    "python-dotenv",
+    "httpx",
+    "yt-dlp",
+    "openai>=1.56.0",
+    "python-multipart",
+]
+
+# TODO: Add black as a dev dependency and check code format
+
+[tool.uv]
+package = true
