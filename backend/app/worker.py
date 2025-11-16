@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 import os
 import shutil
 import tempfile
@@ -52,6 +53,7 @@ async def run_job(job_id: str, url: str, db_factory: Callable[[], Session]):
 async def _run(job: Job, url: str, db: Session):
     job.status = JobStatus.downloading
     db.commit()
+    logging.info("job %s started, url=%s", job.id, url)
     broadcast(job.id, {"stage": JobStatus.downloading, "message": "Downloading audio"})
 
     cache_path = get_cache_path(url)
@@ -59,6 +61,7 @@ async def _run(job: Job, url: str, db: Session):
     if cache_path.exists():
         audio_path = cache_path
         broadcast(job.id, {"stage": JobStatus.downloading, "message": "Cache hit, reuse audio"})
+        logging.info("job %s cache hit %s", job.id, audio_path)
     else:
         with tempfile.TemporaryDirectory() as tmpdir:
             target_base = Path(tmpdir) / f"{job.id}"
@@ -66,6 +69,7 @@ async def _run(job: Job, url: str, db: Session):
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(downloaded, cache_path)
             audio_path = cache_path
+        logging.info("job %s downloaded to %s", job.id, audio_path)
 
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file missing: {audio_path}")
@@ -76,6 +80,7 @@ async def _run(job: Job, url: str, db: Session):
 
     raw_text = await stream_transcription(audio_path, job.id)
     job.raw_text = raw_text
+    logging.info("job %s transcription done, length=%d", job.id, len(raw_text))
 
     job.status = JobStatus.formatting
     db.commit()
@@ -83,10 +88,12 @@ async def _run(job: Job, url: str, db: Session):
 
     formatted = await stream_formatting(raw_text, job.id)
     job.formatted_text = formatted
+    logging.info("job %s formatting done, length=%d", job.id, len(formatted))
 
     job.status = JobStatus.done
     db.commit()
     broadcast(job.id, {"stage": JobStatus.done, "message": "Done"})
+    logging.info("job %s completed", job.id)
 
 
 async def download_audio(url: str, target_base: Path) -> Path:
@@ -154,10 +161,11 @@ async def stream_transcription(audio_path: Path, job_id: str) -> str:
         stream = await client.audio.transcriptions.create(
             file=f,
             model="gpt-4o-mini-transcribe",
-            response_format="verbose_json",
+            response_format="json",
             stream=True,
         )
         async for event in stream:
+            logging.info(f"Transcription event: {event}")
             # events documented as transcript.text.delta / .done
             event_type = getattr(event, "type", None) or event.get("type", None)
             if event_type and "delta" in event_type:
@@ -169,7 +177,7 @@ async def stream_transcription(audio_path: Path, job_id: str) -> str:
             elif event_type and "done" in event_type:
                 text = getattr(event, "text", None) or event.get("text")
                 if text:
-                    accumulated.append(text)
+                    accumulated = [text]
             # fallback: if event has 'text'
             elif hasattr(event, "text"):
                 accumulated.append(event.text)

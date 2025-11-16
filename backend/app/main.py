@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -11,6 +12,10 @@ from .schemas import CreateJobRequest, JobResponse, JobsResponse
 from .worker import broadcast, create_job_record, enqueue_job, register_queue, unregister_queue
 
 load_dotenv()
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Bilibili Transcriber", version="0.1.0")
