@@ -161,9 +161,6 @@ export default function App() {
                 gpt-4o-mini-transcribe + DeepSeek
               </Badge>
             </Group>
-            <Anchor size="sm" component={Link} to="/history" c="blue.6">
-              查看历史记录
-            </Anchor>
             <TextInput
               type="url"
               label="视频链接"

@@ -14,23 +14,17 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <QueryClientProvider client={client}>
       <MantineProvider defaultColorScheme="light">
         <BrowserRouter>
-          <AppShell
-            header={{ height: 60 }}
-            padding="md"
-            styles={{ body: { backgroundColor: "#f8f9fa" } }}
-            headerRenderer={() => (
-              <AppShell.Header>
-                <Group h="100%" px="md">
-                  <Anchor component={Link} to="/">
-                    首页
-                  </Anchor>
-                  <Anchor component={Link} to="/history">
-                    历史记录
-                  </Anchor>
-                </Group>
-              </AppShell.Header>
-            )}
-          >
+          <AppShell header={{ height: 60 }} padding="md">
+            <AppShell.Header>
+              <Group h="100%" px="md">
+                <Anchor component={Link} to="/">
+                  首页
+                </Anchor>
+                <Anchor component={Link} to="/history">
+                  历史记录
+                </Anchor>
+              </Group>
+            </AppShell.Header>
             <AppShell.Main>
               <Routes>
                 <Route path="/" element={<App />} />

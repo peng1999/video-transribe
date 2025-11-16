@@ -11,12 +11,16 @@
 - Backend (from `backend/`):
   - `uv sync` — install deps into `.venv` (uses `pyproject.toml`).
   - `uv run uvicorn app.main:app --reload --port 8000` — run API with auto-reload via uv-managed venv.
-  - `uv run black app` / `uv run ruff format app` — Python 格式化。
+  - `uv run black app` — Python 格式化。
 - Frontend (from `frontend/`):
   - `npm install` — install JS deps.
   - `npm run dev -- --host` — start Vite dev server with API proxy.
   - `npm run build` — production build to `dist/`.
   - `npx prettier@2.8.8 --write "src/**/*.{ts,tsx}"` — 前端格式化（兼容 Node 12）。
+  - `npx tsc --noEmit` — 类型检查（使用 `.nvmrc` 指定的 Node 版本，如 `v25.2.0`）。
+
+## Node 版本
+- 项目根目录提供 `.nvmrc`，版本 `v25.2.0`。建议执行 `nvm use` 后再运行前端命令，确保与工具链版本匹配。
 
 ## Coding Style & Naming Conventions
 - Python: keep functions small; prefer `async` for IO paths; follow PEP8 (4-space indent). Use clear stage names matching `JobStatus` enum.
