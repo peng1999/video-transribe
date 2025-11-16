@@ -2,7 +2,14 @@ import asyncio
 import logging
 import os
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -23,7 +30,7 @@ logging.basicConfig(
 )
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Bilibili Transcriber", version="0.1.0", root_path="/api")
+app = FastAPI(title="Bilibili Transcriber", version="0.1.0")
 
 origins = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
@@ -36,9 +43,20 @@ app.add_middleware(
 
 
 @app.post("/api/jobs", response_model=JobResponse)
-async def create_job(body: CreateJobRequest, db: Session = Depends(get_db)):
+async def create_job(
+    body: CreateJobRequest, request: Request, db: Session = Depends(get_db)
+):
     if "bilibili.com" not in body.url.host:
         raise HTTPException(status_code=400, detail="仅允许 bilibili 链接")
+
+    cf_email = request.headers.get("Cf-Access-Authenticated-User-Email")
+    if cf_email:
+        logging.info("create_job by CF user: %s", cf_email)
+        # TODO: remove this hardcode
+        if cf_email != "pg999w@gmail.com":
+            raise HTTPException(status_code=403, detail="仅允许管理员创建请求")
+    else:
+        logging.warning("create_job without CF user email")
 
     job = create_job_record(str(body.url), db)
     enqueue_job(job)

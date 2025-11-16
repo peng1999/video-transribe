@@ -22,17 +22,17 @@ export interface Job {
 }
 
 export async function createJob(url: string) {
-  const res = await api.post<Job>("/api/jobs", { url });
+  const res = await api.post<Job>("/jobs", { url });
   return res.data;
 }
 
 export async function listJobs() {
-  const res = await api.get<{ jobs: Job[] }>("/api/jobs");
+  const res = await api.get<{ jobs: Job[] }>("/jobs");
   return res.data.jobs;
 }
 
 export async function getJob(id: string) {
-  const res = await api.get<Job>(`/api/jobs/${id}`);
+  const res = await api.get<Job>(`/jobs/${id}`);
   return res.data;
 }
 
