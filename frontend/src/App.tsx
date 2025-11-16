@@ -99,7 +99,12 @@ export default function App() {
 
   const connectWebSocket = (id: string) => {
     wsRef.current?.close();
-    const ws = subscribeJob(id, handleStreamMessage);
+    const ws = subscribeJob(id, handleStreamMessage, () => {
+      const current = stageRef.current;
+      if (current && current !== "done" && current !== "error") {
+        setTimeout(() => connectWebSocket(id), 1000);
+      }
+    });
     wsRef.current = ws;
   };
 

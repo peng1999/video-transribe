@@ -16,6 +16,7 @@ export default function History() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["jobs"],
     queryFn: listJobs,
+    refetchInterval: 5000,
   });
 
   if (isLoading) return <p>加载中...</p>;
