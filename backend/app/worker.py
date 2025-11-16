@@ -163,13 +163,18 @@ async def stream_transcription(audio_path: Path, job_id: str) -> str:
     accumulated = []
     word_count = 0
     with open(audio_path, "rb") as f:
+        logging.info("job %s starting transcription stream", job_id)
         stream = await client.audio.transcriptions.create(
             file=f,
             model="gpt-4o-mini-transcribe",
             response_format="json",
             stream=True,
         )
+        first = True
         async for event in stream:
+            if first:
+                logging.info("job %s received first transcription event", job_id)
+                first = False
             # events documented as transcript.text.delta / .done
             if "delta" in event.type:
                 delta = event.delta
