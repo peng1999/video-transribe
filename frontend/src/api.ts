@@ -22,23 +22,23 @@ export interface Job {
 }
 
 export async function createJob(url: string) {
-  const res = await api.post<Job>("/jobs", { url });
+  const res = await api.post<Job>("/api/jobs", { url });
   return res.data;
 }
 
 export async function listJobs() {
-  const res = await api.get<{ jobs: Job[] }>("/jobs");
+  const res = await api.get<{ jobs: Job[] }>("/api/jobs");
   return res.data.jobs;
 }
 
 export async function getJob(id: string) {
-  const res = await api.get<Job>(`/jobs/${id}`);
+  const res = await api.get<Job>(`/api/jobs/${id}`);
   return res.data;
 }
 
 export function subscribeJob(jobId: string, onMessage: (data: any) => void) {
   const ws = new WebSocket(
-    `${location.origin.replace("http", "ws")}/ws/jobs/${jobId}`
+    `${location.origin.replace("http", "ws")}/api/ws/jobs/${jobId}`
   );
   ws.onmessage = (event) => {
     try {

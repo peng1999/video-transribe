@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Bilibili Transcriber", version="0.1.0")
+app = FastAPI(title="Bilibili Transcriber", version="0.1.0", root_path="/api")
 
 origins = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
@@ -36,7 +36,7 @@ app.add_middleware(
 )
 
 
-@app.post("/jobs", response_model=JobResponse)
+@app.post("/api/jobs", response_model=JobResponse)
 async def create_job(body: CreateJobRequest, db: Session = Depends(get_db)):
     if "bilibili.com" not in body.url.host:
         raise HTTPException(status_code=400, detail="仅允许 bilibili 链接")
@@ -46,13 +46,13 @@ async def create_job(body: CreateJobRequest, db: Session = Depends(get_db)):
     return job
 
 
-@app.get("/jobs", response_model=JobsResponse)
+@app.get("/api/jobs", response_model=JobsResponse)
 def list_jobs(db: Session = Depends(get_db)):
     jobs = db.query(Job).order_by(Job.created_at.desc()).limit(50).all()
     return JobsResponse(jobs=jobs)
 
 
-@app.get("/jobs/{job_id}", response_model=JobResponse)
+@app.get("/api/jobs/{job_id}", response_model=JobResponse)
 def get_job(job_id: str, db: Session = Depends(get_db)):
     job = db.query(Job).get(job_id)
     if not job:
@@ -60,7 +60,7 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     return job
 
 
-@app.websocket("/ws/jobs/{job_id}")
+@app.websocket("/api/ws/jobs/{job_id}")
 async def job_ws(websocket: WebSocket, job_id: str, db: Session = Depends(get_db)):
     await websocket.accept()
     queue = register_queue(job_id)

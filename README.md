@@ -34,11 +34,11 @@ npm run dev -- --host
 ```
 Vite dev server 通过代理将 `/api` 指向 `http://localhost:8000`，WebSocket `/ws` 同理。
 
-## 接口概览
-- `POST /jobs` { url } 创建任务并立即后台执行。
-- `GET /jobs/{id}` 查询单个任务。
-- `GET /jobs` 最近 50 条历史。
-- `WS /ws/jobs/{id}` 持续推送阶段、字数和文本增量。
+## 接口概览（均带前缀 /api）
+- `POST /api/jobs` { url } 创建任务并立即后台执行。
+- `GET /api/jobs/{id}` 查询单个任务。
+- `GET /api/jobs` 最近 50 条历史。
+- `WS /api/ws/jobs/{id}` 持续推送阶段、字数和文本增量。
 
 ## 流程
 1) yt-dlp 下载 Bilibili 音频 (mp3)。
