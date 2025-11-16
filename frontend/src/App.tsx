@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { createJob, subscribeJob, JobStage } from './api'
+import { useSearchParams } from 'react-router-dom'
+import { createJob, subscribeJob, JobStage, getJob } from './api'
 
 interface ProgressEvent {
   stage?: JobStage
@@ -21,6 +22,7 @@ const stages: DisplayStage[] = [
   { key: 'transcribing', label: '转录中' },
   { key: 'formatting', label: '整理中' },
   { key: 'done', label: '完成' },
+  { key: 'error', label: '失败' },
 ]
 
 function StageBadge({ active }: { active: boolean }) {
@@ -48,6 +50,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const stageRef = useRef<JobStage | 'pending'>('pending')
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     return () => {
@@ -55,37 +58,74 @@ export default function App() {
     }
   }, [])
 
-  const startJob = async (e: FormEvent) => {
-    e.preventDefault()
+  const resetView = () => {
     setError(null)
     setFormatted('')
     setRaw('')
     setWordCount(0)
+  }
+
+  const handleStreamMessage = (payload: ProgressEvent) => {
+    if (payload.stage) {
+      setStage(payload.stage)
+      stageRef.current = payload.stage
+    }
+    const currentStage = payload.stage ?? stageRef.current
+    if (payload.words !== undefined) setWordCount(payload.words)
+    if (payload.chunk && currentStage === 'transcribing') setRaw((prev) => prev + payload.chunk)
+    if (payload.chunk && currentStage === 'formatting') setFormatted((prev) => prev + payload.chunk)
+    if (payload.raw_text) setRaw(payload.raw_text)
+    if (payload.formatted_text) setFormatted(payload.formatted_text)
+    if (payload.error) setError(payload.error)
+  }
+
+  const connectWebSocket = (id: string) => {
+    wsRef.current?.close()
+    const ws = subscribeJob(id, handleStreamMessage)
+    wsRef.current = ws
+  }
+
+  const startJob = async (e: FormEvent) => {
+    e.preventDefault()
+    resetView()
     try {
       const job = await createJob(url)
       setJobId(job.id)
       setStage('downloading')
       stageRef.current = 'downloading'
-      const ws = subscribeJob(job.id, (payload: ProgressEvent) => {
-        if (payload.stage) {
-          setStage(payload.stage)
-          stageRef.current = payload.stage
-        }
-        const currentStage = payload.stage ?? stageRef.current
-        if (payload.words !== undefined) setWordCount(payload.words)
-        if (payload.chunk && currentStage === 'transcribing')
-          setRaw((prev) => prev + payload.chunk)
-        if (payload.chunk && currentStage === 'formatting')
-          setFormatted((prev) => prev + payload.chunk)
-        if (payload.raw_text) setRaw(payload.raw_text)
-        if (payload.formatted_text) setFormatted(payload.formatted_text)
-        if (payload.error) setError(payload.error)
-      })
-      wsRef.current = ws
+      connectWebSocket(job.id)
     } catch (err: any) {
       setError(err?.response?.data?.detail || '创建任务失败')
     }
   }
+
+  const loadJobFromQuery = async (id: string) => {
+    resetView()
+    setJobId(id)
+    try {
+      const job = await getJob(id)
+      setStage(job.status)
+      stageRef.current = job.status
+      setRaw(job.raw_text || '')
+      setFormatted(job.formatted_text || '')
+      const baseText = job.formatted_text || job.raw_text || ''
+      setWordCount(baseText ? baseText.split(/\s+/).filter(Boolean).length : 0)
+      if (job.error) setError(job.error)
+      if (job.status !== 'done' && job.status !== 'error') {
+        connectWebSocket(id)
+      }
+    } catch (err) {
+      setError('任务不存在或获取失败')
+    }
+  }
+
+  useEffect(() => {
+    const q = searchParams.get('job')
+    if (q) {
+      loadJobFromQuery(q)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const stageMap = useMemo(() => Object.fromEntries(stages.map((s) => [s.key, s.label])), [])
 
