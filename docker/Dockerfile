@@ -14,14 +14,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl ca-
 # install uv
 RUN pip install --no-cache-dir uv
 
-# copy project metadata for lock install
-COPY backend/pyproject.toml backend/uv.lock ./
+# copy metadata and minimal package stub so uv editable install succeeds
+COPY backend/pyproject.toml backend/uv.lock backend/README.md ./
+COPY backend/app/__init__.py ./app/__init__.py
 RUN uv sync --frozen --no-dev
 ENV PATH="/app/backend/.venv/bin:${PATH}"
 
-# copy source
+# copy full source after deps are cached
 COPY backend/app ./app
-COPY backend/README.md ./
 
 # copy built frontend for potential static serving (not used by nginx container)
 COPY --from=frontend /app/frontend/dist ../frontend/dist

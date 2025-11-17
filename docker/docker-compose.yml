@@ -5,11 +5,10 @@ services:
       dockerfile: docker/Dockerfile
       target: backend
     env_file:
-      - ../backend/.env
+      - .env
     volumes:
       - ./backend_cache:/app/backend/cache
-    ports:
-      - "8020:8000"
+      - ./backend_data/data.db:/app/backend/data.db
 
   frontend:
     build:
