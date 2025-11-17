@@ -13,12 +13,14 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from .db import Base, engine, get_db
+from .db import Base, engine, get_db, SessionLocal
 from .models import Job, JobStatus
 from .schemas import CreateJobRequest, JobResponse, JobsResponse
 from .worker import (
     create_job_record,
     enqueue_job,
+    broadcast,
+    stream_formatting,
     register_queue,
     unregister_queue,
 )
@@ -74,6 +76,61 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     job = db.query(Job).get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Not found")
+    return job
+
+
+@app.post("/api/jobs/{job_id}/regenerate", response_model=JobResponse)
+async def regenerate_formatted_text(job_id: str, db: Session = Depends(get_db)):
+    job = db.query(Job).get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Not found")
+    if job.status in {
+        JobStatus.downloading,
+        JobStatus.transcribing,
+        JobStatus.formatting,
+        JobStatus.pending,
+    }:
+        raise HTTPException(status_code=400, detail="任务正在进行中，无法重新整理")
+    if not job.raw_text:
+        raise HTTPException(status_code=400, detail="缺少原始转录，无法重新整理")
+
+    job.status = JobStatus.formatting
+    job.formatted_text = None
+    job.error = None
+    db.commit()
+    broadcast(job_id, {"stage": JobStatus.formatting, "message": "重新整理中"})
+
+    async def _regenerate():
+        db_task = SessionLocal()
+        try:
+            job_task = db_task.query(Job).get(job_id)
+            if not job_task:
+                broadcast(job_id, {"stage": JobStatus.error, "error": "任务不存在"})
+                return
+            formatted = await stream_formatting(job.raw_text or "", job_id)
+            job_task.formatted_text = formatted
+            job_task.status = JobStatus.done
+            db_task.commit()
+            broadcast(
+                job_id,
+                {
+                    "stage": JobStatus.done,
+                    "formatted_text": formatted,
+                    "message": "重新整理完成",
+                },
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logging.exception("regenerate job %s failed", job_id)
+            job_task = db_task.query(Job).get(job_id)
+            if job_task:
+                job_task.status = JobStatus.error
+                job_task.error = str(exc)
+                db_task.commit()
+            broadcast(job_id, {"stage": JobStatus.error, "error": str(exc)})
+        finally:
+            db_task.close()
+
+    asyncio.create_task(_regenerate())
     return job
 
 

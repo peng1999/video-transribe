@@ -214,10 +214,15 @@ async def stream_formatting(raw_text: str, job_id: str) -> str:
     api_key = os.getenv("DEEPSEEK_API_KEY")
     client = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
+    system_prompt = (
+        "你是一个乐于助人的助手。你的任务是纠正转录文本中的所有拼写错误。"
+        "仅添加必要的标点符号，例如句号、逗号，并且仅使用提供的上下文。"
+    )
+
     messages = [
         {
             "role": "system",
-            "content": "You are a transcript formatter. Clean up text, keep meaning, add paragraphs and timestamps if present.",
+            "content": system_prompt,
         },
         {"role": "user", "content": raw_text},
     ]

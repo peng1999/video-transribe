@@ -42,8 +42,8 @@ export default function History() {
                   job.status === "done"
                     ? "green"
                     : job.status === "error"
-                    ? "red"
-                    : "blue"
+                      ? "red"
+                      : "blue"
                 }
               >
                 {job.status}

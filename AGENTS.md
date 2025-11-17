@@ -16,11 +16,11 @@
   - `npm install` — install JS deps.
   - `npm run dev -- --host` — start Vite dev server with API proxy.
   - `npm run build` — production build to `dist/`.
-  - `npx prettier@2.8.8 --write "src/**/*.{ts,tsx}"` — 前端格式化（兼容 Node 12）。
+  - `npm exec prettier -- --write "src/**/*.{ts,tsx,js,jsx}"` — 前端格式化（使用 nvm 提供的最新版 Prettier）。
   - `npx tsc --noEmit` — 类型检查（使用 `.nvmrc` 指定的 Node 版本，如 `v25.2.0`）。
 
 ## Node 版本
-- 项目根目录提供 `.nvmrc`，版本 `v25.2.0`。建议执行 `nvm use` 后再运行前端命令，确保与工具链版本匹配。
+- 项目根目录提供 `.nvmrc`，版本 `v25.2.0`。建议执行 `nvm use` 后再运行前端命令，确保与工具链版本匹配。若使用 fish，**优先**运行 `fish -c 'nvm use'`（自动定位 nvm 安装路径）；仅在特殊场景下再手动设置 `set -x PATH ~/.local/share/nvm/v25.2.0/bin $PATH` 作为备用方案。
 
 ## Coding Style & Naming Conventions
 - Python: keep functions small; prefer `async` for IO paths; follow PEP8 (4-space indent). Use clear stage names matching `JobStatus` enum.

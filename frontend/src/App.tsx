@@ -16,7 +16,13 @@ import {
   Title,
 } from "@mantine/core";
 import { IconAlertCircle } from "@tabler/icons-react";
-import { createJob, subscribeJob, JobStage, getJob } from "./api";
+import {
+  createJob,
+  subscribeJob,
+  JobStage,
+  getJob,
+  regenerateJob,
+} from "./api";
 
 interface ProgressEvent {
   stage?: JobStage;
@@ -152,8 +158,34 @@ export default function App() {
 
   const stageMap = useMemo(
     () => Object.fromEntries(stages.map((s) => [s.key, s.label])),
-    []
+    [],
   );
+
+  const isProcessing =
+    stage === "downloading" ||
+    stage === "transcribing" ||
+    stage === "formatting";
+
+  const handleRegenerate = async () => {
+    if (!jobId) return;
+    if (!raw) {
+      setError("暂无原始转录，无法重新整理");
+      return;
+    }
+    setError(null);
+    setFormatted("");
+    setStage("formatting");
+    stageRef.current = "formatting";
+    setWordCount(0);
+    connectWebSocket(jobId);
+    try {
+      await regenerateJob(jobId);
+    } catch (err: any) {
+      setStage("error");
+      stageRef.current = "error";
+      setError(err?.response?.data?.detail || "重新整理失败");
+    }
+  };
 
   return (
     <Container size="lg" py="md">
@@ -197,7 +229,15 @@ export default function App() {
                 </Text>
                 <Text fw={600}>{jobId}</Text>
               </div>
-              <Group gap="xs">
+              <Group gap="xs" align="flex-start">
+                <Button
+                  size="xs"
+                  variant="light"
+                  onClick={handleRegenerate}
+                  disabled={isProcessing}
+                >
+                  重新用 DeepSeek 整理
+                </Button>
                 {stages.map((s) => (
                   <Badge
                     key={s.key}
