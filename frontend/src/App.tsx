@@ -108,24 +108,24 @@ export default function App() {
   const connectWebSocket = (id: string) => {
     wsRef.current?.close();
     console.debug("ws connecting", id);
-    const ws = subscribeJob(
-      id,
-      handleStreamMessage,
-      (event) => {
-        const current = stageRef.current;
-        if (
-          current === "done" ||
-          current === "error" ||
-          event?.code === 1000 ||
-          event?.code === 1001
-        ) {
-          console.debug("ws close no reconnect", event?.code, event?.reason);
-          return;
-        }
-        console.debug("ws closed, will reconnect in 1s", event?.code, event?.reason);
-        setTimeout(() => connectWebSocket(id), 1000);
-      },
-    );
+    const ws = subscribeJob(id, handleStreamMessage, (event) => {
+      const current = stageRef.current;
+      if (
+        current === "done" ||
+        current === "error" ||
+        event?.code === 1000 ||
+        event?.code === 1001
+      ) {
+        console.debug("ws close no reconnect", event?.code, event?.reason);
+        return;
+      }
+      console.debug(
+        "ws closed, will reconnect in 1s",
+        event?.code,
+        event?.reason,
+      );
+      setTimeout(() => connectWebSocket(id), 1000);
+    });
     ws.onopen = () => {
       console.debug("ws open", id);
     };
@@ -277,24 +277,30 @@ export default function App() {
             </Group>
 
             <Grid gutter="md">
-              <Grid.Col span={6}>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
                 <Card padding="md" radius="sm" withBorder>
                   <Group gap={6} mb="xs">
                     <Title order={5}>原始转录</Title>
                     {stage === "transcribing" && <Loader size="sm" />}
                   </Group>
-                  <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                  <Text
+                    size="sm"
+                    style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                  >
                     {raw || "（等待转录中...）"}
                   </Text>
                 </Card>
               </Grid.Col>
-              <Grid.Col span={6}>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
                 <Card padding="md" radius="sm" withBorder>
                   <Group gap={6} mb="xs">
                     <Title order={5}>整理后文本</Title>
                     {stage === "formatting" && <Loader size="sm" />}
                   </Group>
-                  <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                  <Text
+                    size="sm"
+                    style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                  >
                     {formatted || "（等待整理中...）"}
                   </Text>
                 </Card>
