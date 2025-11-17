@@ -76,6 +76,7 @@ export default function App() {
 
   useEffect(() => {
     return () => {
+      console.debug("ws cleanup on unmount");
       wsRef.current?.close();
     };
   }, []);
@@ -88,6 +89,7 @@ export default function App() {
   };
 
   const handleStreamMessage = (payload: ProgressEvent) => {
+    console.debug("ws message");
     if (payload.stage) {
       setStage(payload.stage);
       stageRef.current = payload.stage;
@@ -105,12 +107,31 @@ export default function App() {
 
   const connectWebSocket = (id: string) => {
     wsRef.current?.close();
-    const ws = subscribeJob(id, handleStreamMessage, () => {
-      const current = stageRef.current;
-      if (current && current !== "done" && current !== "error") {
+    console.debug("ws connecting", id);
+    const ws = subscribeJob(
+      id,
+      handleStreamMessage,
+      (event) => {
+        const current = stageRef.current;
+        if (
+          current === "done" ||
+          current === "error" ||
+          event?.code === 1000 ||
+          event?.code === 1001
+        ) {
+          console.debug("ws close no reconnect", event?.code, event?.reason);
+          return;
+        }
+        console.debug("ws closed, will reconnect in 1s", event?.code, event?.reason);
         setTimeout(() => connectWebSocket(id), 1000);
-      }
-    });
+      },
+    );
+    ws.onopen = () => {
+      console.debug("ws open", id);
+    };
+    ws.onerror = (e) => {
+      console.error("ws error", e);
+    };
     wsRef.current = ws;
   };
 

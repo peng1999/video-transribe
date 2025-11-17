@@ -23,7 +23,9 @@ from .worker import (
     stream_formatting,
     register_queue,
     unregister_queue,
+    latest_payload,
 )
+
 
 load_dotenv()
 logging.basicConfig(
@@ -139,6 +141,8 @@ async def job_ws(websocket: WebSocket, job_id: str, db: Session = Depends(get_db
     await websocket.accept()
     queue = register_queue(job_id)
 
+    logging.info("ws accepted job_id=%s client=%s", job_id, websocket.client)
+
     job = db.query(Job).get(job_id)
     if not job:
         await websocket.send_json({"error": "not found"})
@@ -155,13 +159,23 @@ async def job_ws(websocket: WebSocket, job_id: str, db: Session = Depends(get_db
         }
     )
 
+    # send latest in-memory payload (captures partial formatting chunks)
+    if job_id in latest_payload:
+        await websocket.send_json(latest_payload[job_id])
+
     try:
         while True:
-            payload = await queue.get()
-            await websocket.send_json(payload)
+            try:
+                payload = await queue.get()
+                await websocket.send_json(payload)
+            except Exception as send_exc:
+                logging.exception("ws send failed job_id=%s exc=%s", job_id, send_exc)
+                raise
     except WebSocketDisconnect:
+        logging.info("ws disconnect job_id=%s client=%s", job_id, websocket.client)
         unregister_queue(job_id, queue)
     except Exception as exc:
+        logging.exception("ws loop error job_id=%s exc=%s", job_id, exc)
         unregister_queue(job_id, queue)
         await websocket.close(code=1011, reason=str(exc))
 

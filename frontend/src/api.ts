@@ -44,7 +44,7 @@ export async function regenerateJob(id: string) {
 export function subscribeJob(
   jobId: string,
   onMessage: (data: any) => void,
-  onClose?: () => void,
+  onClose?: (event: CloseEvent) => void,
 ) {
   const ws = new WebSocket(
     `${location.origin.replace("http", "ws")}/api/ws/jobs/${jobId}`,
@@ -57,8 +57,9 @@ export function subscribeJob(
       console.error("failed to parse ws message", e);
     }
   };
-  ws.onclose = () => {
-    onClose?.();
+  ws.onclose = (event) => {
+    console.debug("ws onclose", { code: event.code, reason: event.reason });
+    onClose?.(event);
   };
   return ws;
 }

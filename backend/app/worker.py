@@ -16,6 +16,15 @@ from .db import SessionLocal
 
 # simple in-memory subscriber queues per job for WebSocket streaming
 subscribers: Dict[str, List[asyncio.Queue]] = {}
+# store latest payload per job so late subscribers can catch up
+latest_payload: Dict[str, dict] = {}
+
+
+def update_snapshot(job_id: str, payload: dict):
+    base = latest_payload.get(job_id, {})
+    # Late joiners shouldn't reapply the last streamed chunk (frontend already has formatted_text).
+    snapshot_payload = {k: v for k, v in payload.items() if k != "chunk"}
+    latest_payload[job_id] = {**base, **snapshot_payload}
 
 
 def register_queue(job_id: str) -> asyncio.Queue:
@@ -32,6 +41,8 @@ def unregister_queue(job_id: str, queue: asyncio.Queue):
 
 
 def broadcast(job_id: str, payload: dict):
+    # merge payload into latest snapshot for late joiners
+    update_snapshot(job_id, payload)
     for queue in subscribers.get(job_id, []):
         queue.put_nowait(payload)
 
@@ -243,9 +254,18 @@ async def stream_formatting(raw_text: str, job_id: str) -> str:
         if delta:
             chunks.append(delta)
             token_count += len(delta.split())
-            broadcast(
+            accumulated = "".join(chunks)
+            # update snapshot for late subscribers but avoid sending huge payload every chunk
+            update_snapshot(
                 job_id,
-                {"stage": JobStatus.formatting, "words": token_count, "chunk": delta},
+                {
+                    "stage": JobStatus.formatting,
+                    "words": token_count,
+                    "formatted_text": accumulated,
+                },
+            )
+            broadcast(
+                job_id, {"stage": JobStatus.formatting, "words": token_count, "chunk": delta}
             )
     return "".join(chunks)
 
