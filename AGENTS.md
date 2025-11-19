@@ -41,3 +41,6 @@
 - Never commit real API keys. Use `backend/.env` locally and deployment secrets in CI/hosting.
 - Requires `ffmpeg` on host for yt-dlp; document install if not present.
 - Validate user input: current API restricts to `bilibili.com` URLs; keep or extend carefully.
+
+## 如何完成 TODO
+当用户让你完成 TODO 时，你应该检索项目中标注出的所有 todo 项，然后选择一个最容易完成的向用户展示。得到用户同意后，完成该 TODO 并删除该 todo 项。

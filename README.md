@@ -53,5 +53,7 @@ Vite dev server 通过代理将 `/api` 指向 `http://localhost:8000`，WebSocke
 - 已下载的音频会按 URL 哈希缓存在 `backend/cache/`，重复请求相同 URL 会复用；可通过 `AUDIO_CACHE_DIR` 自定义位置。
 
 # TODO
+- 优化移动端显示
+  - 让左右的 padding 更小
 - 显示详细信息，如视频长度，使用token数，预估花费等
 - 允许用户提供校正用的术语

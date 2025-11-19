@@ -28,6 +28,12 @@ from .worker import (
 
 
 load_dotenv()
+ALLOWED_CF_EMAILS = frozenset(
+    email.strip()
+    for email in os.getenv("CF_ALLOWED_EMAILS", "pg999w@gmail.com").split(",")
+    if email.strip()
+)
+
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -54,13 +60,10 @@ async def create_job(
         raise HTTPException(status_code=400, detail="仅允许 bilibili 链接")
 
     cf_email = request.headers.get("Cf-Access-Authenticated-User-Email")
-    if cf_email:
-        logging.info("create_job by CF user: %s", cf_email)
-        # TODO: remove this hardcode
-        if cf_email != "pg999w@gmail.com":
-            raise HTTPException(status_code=403, detail="仅允许管理员创建请求")
-    else:
-        logging.warning("create_job without CF user email")
+    logging.info("create_job by CF user: %s", cf_email)
+
+    if not cf_email or cf_email not in ALLOWED_CF_EMAILS:
+        raise HTTPException(status_code=403, detail="仅允许管理员创建请求")
 
     job = create_job_record(str(body.url), db)
     enqueue_job(job)
