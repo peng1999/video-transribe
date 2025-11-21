@@ -3,9 +3,10 @@
 前后端分离：FastAPI 后端负责下载/转录/整理；React 前端提供输入、进度展示与历史记录。
 
 ## 依赖
-- Python 3.10+
+- Python 3.13+
 - Node 18+
 - ffmpeg（yt-dlp 提取音频需要）
+- Docker 镜像使用 `python:3.13-slim`（后端）与 `node:20-alpine`（前端构建）
 
 ## 配置
 复制 `backend/.env.example` 到 `backend/.env` 并填入密钥：
@@ -25,6 +26,11 @@ uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
 > 若 `uv` 不在 PATH，可用 `/home/linuxbrew/.linuxbrew/bin/uv` 调用。
+
+运行后端格式化：
+```bash
+uv run black app
+```
 
 ## 前端运行
 ```bash

@@ -1,10 +1,10 @@
-import enum
+from enum import StrEnum
 from datetime import datetime
 from sqlalchemy import Column, DateTime, Enum, String, Text
 from .db import Base
 
 
-class JobStatus(str, enum.Enum):
+class JobStatus(StrEnum):
     pending = "pending"
     downloading = "downloading"
     transcribing = "transcribing"

@@ -20,3 +20,4 @@ backend/*.egg-info
 backend/.venv
 backend/.uv
 backend/cache/
+docker/backend_cache

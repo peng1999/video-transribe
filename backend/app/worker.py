@@ -5,8 +5,9 @@ import os
 import shutil
 import tempfile
 import uuid
+from contextlib import chdir
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Callable
 
 import yt_dlp
 from sqlalchemy.orm import Session
@@ -15,9 +16,9 @@ from .models import Job, JobStatus
 from .db import SessionLocal
 
 # simple in-memory subscriber queues per job for WebSocket streaming
-subscribers: Dict[str, List[asyncio.Queue]] = {}
+subscribers: dict[str, list[asyncio.Queue]] = {}
 # store latest payload per job so late subscribers can catch up
-latest_payload: Dict[str, dict] = {}
+latest_payload: dict[str, dict] = {}
 
 
 def update_snapshot(job_id: str, payload: dict):
@@ -114,22 +115,24 @@ async def download_audio(url: str, target_base: Path) -> Path:
     loop = asyncio.get_event_loop()
 
     def _download():
-        ydl_opts = {
-            "extract_audio": True,
-            "format": "worstaudio/worst",
-            "outtmpl": f"{target_base}.%(ext)s",  # ensure extension placeholder
-            "final_ext": "mp3",
-            "quiet": True,
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }
-            ],
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        target_base.parent.mkdir(parents=True, exist_ok=True)
+        with chdir(target_base.parent):
+            ydl_opts = {
+                "extract_audio": True,
+                "format": "worstaudio/worst",
+                "outtmpl": f"{target_base.name}.%(ext)s",  # ensure extension placeholder
+                "final_ext": "mp3",
+                "quiet": True,
+                "postprocessors": [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "192",
+                    }
+                ],
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
 
     await loop.run_in_executor(None, _download)
 
@@ -149,15 +152,19 @@ def find_audio_file(target_base: Path) -> Path | None:
         p = target_base.with_suffix(ext)
         if p.exists():
             return p
-    # fallback: newest audio-like file in directory
-    audio_glob = list(target_base.parent.glob("*.*"))
-    audio_sorted = sorted(
-        [p for p in audio_glob if p.suffix.lower() in exts],
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
-    if audio_sorted:
-        return audio_sorted[0]
+    parent = target_base.parent
+    if not parent.exists():
+        return None
+    audio_candidates: list[Path] = []
+    for root, dirs, files in parent.walk():
+        audio_candidates.extend(
+            Path(root) / name for name in files if Path(name).suffix.lower() in exts
+        )
+        dirs[:] = []  # single-level scan to mirror previous glob scope
+        break
+
+    if audio_candidates:
+        return max(audio_candidates, key=lambda p: p.stat().st_mtime)
     return None
 
 
@@ -265,7 +272,8 @@ async def stream_formatting(raw_text: str, job_id: str) -> str:
                 },
             )
             broadcast(
-                job_id, {"stage": JobStatus.formatting, "words": token_count, "chunk": delta}
+                job_id,
+                {"stage": JobStatus.formatting, "words": token_count, "chunk": delta},
             )
     return "".join(chunks)
 

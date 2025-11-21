@@ -7,7 +7,7 @@ COPY frontend .
 RUN npm run build
 
 # Backend image (uv project)
-FROM python:3.11-slim AS backend
+FROM python:3.13-slim AS backend
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app/backend
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl ca-certificates && rm -rf /var/lib/apt/lists/*
