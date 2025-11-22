@@ -1,4 +1,14 @@
 services:
+  garage:
+    image: dxflrs/garage:v2.1.0
+    container_name: garage
+    command: ["server", "--config", "/etc/garage.toml"]
+    environment:
+      - RUST_LOG=info
+    volumes:
+      - ./garage_data:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
+
   backend:
     build:
       context: ../
@@ -9,6 +19,8 @@ services:
     volumes:
       - ./backend_cache:/app/backend/cache
       - ./backend_data/data.db:/app/backend/data.db
+    depends_on:
+      - garage
 
   frontend:
     build:

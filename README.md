@@ -67,6 +67,17 @@ Vite dev server 通过代理将 `/api` 指向 `http://localhost:8000`，WebSocke
 - 临时文件在任务结束后会删除。
 - 已下载的音频会按 URL 哈希缓存在 `backend/cache/`，重复请求相同 URL 会复用；可通过 `AUDIO_CACHE_DIR` 自定义位置。
 
+## Docker + Garage（可选本地 S3）
+- 追加服务：`docker/docker-compose.yml` 中提供 Garage S3（镜像 `dxflrs/garage:v2.1.0`）。启动：
+  ```bash
+  cd docker
+  docker compose up -d garage
+  ./init-garage.sh          # 首次生成 bucket 与访问密钥
+  ```
+- 脚本会输出 `AWS_ACCESS_KEY_ID/SECRET`, `S3_ENDPOINT=http://localhost:3900`, `S3_BUCKET=transcribe`，可供后端或其他工具使用。
+- Garage 配置在 `docker/garage.toml`，默认 `rpc_secret` 与 `admin_token` 请按需修改后再启动。若已启动需 `docker compose restart garage` 生效。
+- 端口策略：Garage 不再暴露外部端口；Nginx 将 `/s3/` 代理到 `garage:3900` 供内网/前端使用。如需宿主访问，可临时在 compose 添加端口映射。
+
 # TODO
 - 优化移动端显示
   - 让左右的 padding 更小
