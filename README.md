@@ -15,6 +15,12 @@ OPENAI_API_KEY=...
 DEEPSEEK_API_KEY=...
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
+DASHSCOPE_API_KEY=...                # 阿里百炼
+OSS_ENDPOINT=https://oss-cn-beijing.aliyuncs.com
+OSS_BUCKET=...                       # 提供公网读的 bucket
+OSS_ACCESS_KEY_ID=...
+OSS_ACCESS_KEY_SECRET=...
+OSS_PREFIX=transcribe
 ```
 
 ## 后端运行（uv）
@@ -48,13 +54,16 @@ Vite dev server 通过代理将 `/api` 指向 `http://localhost:8000`，WebSocke
 
 ## 流程
 1) yt-dlp 下载 Bilibili 音频 (mp3)。
-2) OpenAI `gpt-4o-mini-transcribe` 流式转录，实时推送字数+增量文本。
-3) DeepSeek Chat 流式格式化，实时推送整理后的增量文本。
+2) 前端选择 ASR 提供方：
+   - OpenAI `gpt-4o-mini-transcribe` 流式转录。
+   - 阿里百炼 `qwen3-asr-flash-filetrans`：音频上传到 OSS，异步轮询结果。
+   两种都会实时推送字数/文本增量。
+3) DeepSeek Chat 流式格式化。
 4) 结果存储 SQLite，可在历史页查看。
 
 ## 注意
 - 仅允许 bilibili.com 链接。
-- Whisper 文件大小上限 25MB；如需更大，先裁剪或降低音质。
+- OpenAI 模式仍受 Whisper 25MB 上限限制；百炼模式由 OSS/模型限制为可公网获取的音频。
 - 临时文件在任务结束后会删除。
 - 已下载的音频会按 URL 哈希缓存在 `backend/cache/`，重复请求相同 URL 会复用；可通过 `AUDIO_CACHE_DIR` 自定义位置。
 

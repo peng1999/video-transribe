@@ -14,6 +14,11 @@ from sqlalchemy.orm import Session
 
 from .models import Job, JobStatus
 from .db import SessionLocal
+from .providers import (
+    transcribe_with_openai,
+    transcribe_with_bailian,
+    stream_formatting,
+)
 
 # simple in-memory subscriber queues per job for WebSocket streaming
 subscribers: dict[str, list[asyncio.Queue]] = {}
@@ -93,7 +98,16 @@ async def _run(job: Job, url: str, db: Session):
     db.commit()
     broadcast(job.id, {"stage": JobStatus.transcribing, "message": "Transcribing"})
 
-    raw_text = await stream_transcription(audio_path, job.id)
+    provider = job.provider or "openai"
+    if provider == "bailian":
+        raw_text = await transcribe_with_bailian(
+            audio_path,
+            job.id,
+            broadcast,
+            on_task_id=lambda task_id: _persist_task_id(db, job.id, task_id),
+        )
+    else:
+        raw_text = await transcribe_with_openai(audio_path, job.id, broadcast)
     job.raw_text = raw_text
     logging.info("job %s transcription done, length=%d", job.id, len(raw_text))
 
@@ -101,7 +115,7 @@ async def _run(job: Job, url: str, db: Session):
     db.commit()
     broadcast(job.id, {"stage": JobStatus.formatting, "message": "Formatting"})
 
-    formatted = await stream_formatting(raw_text, job.id)
+    formatted = await stream_formatting(raw_text, job.id, broadcast)
     job.formatted_text = formatted
     logging.info("job %s formatting done, length=%d", job.id, len(formatted))
 
@@ -174,112 +188,14 @@ def get_cache_path(url: str) -> Path:
     return cache_dir / f"{hashed}.mp3"
 
 
-async def stream_transcription(audio_path: Path, job_id: str) -> str:
-    from openai import AsyncOpenAI
-
-    client = AsyncOpenAI()
-    accumulated = []
-    word_count = 0
-    with open(audio_path, "rb") as f:
-        logging.info("job %s starting transcription stream", job_id)
-        stream = await client.audio.transcriptions.create(
-            file=f,
-            model="gpt-4o-mini-transcribe",
-            response_format="json",
-            stream=True,
-        )
-        first = True
-        async for event in stream:
-            if first:
-                logging.info("job %s received first transcription event", job_id)
-                first = False
-            # events documented as transcript.text.delta / .done
-            if "delta" in event.type:
-                delta = event.delta
-                accumulated.append(delta)
-                word_count = len("".join(accumulated).split())
-                broadcast(
-                    job_id,
-                    {
-                        "stage": JobStatus.transcribing,
-                        "words": word_count,
-                        "chunk": delta,
-                    },
-                )
-            elif "done" in event.type:
-                text = event.text
-                logging.info(
-                    f"Transcription done event received, input_tokens={event.usage.input_tokens}, output_tokens={event.usage.output_tokens}"
-                )
-                accumulated = [text]
-                # send final full text to front-end to avoid partial leftovers
-                broadcast(
-                    job_id,
-                    {
-                        "stage": JobStatus.transcribing,
-                        "words": len(text.split()),
-                        "raw_text": text,
-                    },
-                )
-
-    return "".join(accumulated)
-
-
-async def stream_formatting(raw_text: str, job_id: str) -> str:
-    from openai import AsyncOpenAI
-
-    base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-    api_key = os.getenv("DEEPSEEK_API_KEY")
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
-
-    system_prompt = (
-        "你是一个乐于助人的助手。你的任务是纠正转录文本中的所有拼写错误。"
-        "仅添加必要的标点符号，例如句号、逗号，并且仅使用提供的上下文。"
+def create_job_record(url: str, provider: str, db: Session) -> Job:
+    chosen_provider = provider or os.getenv("DEFAULT_PROVIDER", "openai")
+    job = Job(
+        id=str(uuid.uuid4()),
+        url=url,
+        provider=chosen_provider,
+        status=JobStatus.pending,
     )
-
-    messages = [
-        {
-            "role": "system",
-            "content": system_prompt,
-        },
-        {"role": "user", "content": raw_text},
-    ]
-
-    stream = await client.chat.completions.create(
-        model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
-        messages=messages,
-        stream=True,
-    )
-    chunks = []
-    token_count = 0
-    async for chunk in stream:
-        delta = None
-        if hasattr(chunk, "choices") and chunk.choices:
-            delta = chunk.choices[0].delta.content
-        elif isinstance(chunk, dict):
-            delta = chunk.get("content")
-        if delta:
-            chunks.append(delta)
-            token_count += len(delta.split())
-            accumulated = "".join(chunks)
-            # update snapshot for late subscribers but avoid sending huge payload every chunk
-            update_snapshot(
-                job_id,
-                {
-                    "stage": JobStatus.formatting,
-                    "words": token_count,
-                    "formatted_text": accumulated,
-                },
-            )
-            broadcast(
-                job_id,
-                {"stage": JobStatus.formatting, "words": token_count, "chunk": delta},
-            )
-    return "".join(chunks)
-
-
-def create_job_record(url: str, db: Session) -> Job:
-    job = Job(id=str(uuid.uuid4()), url=url, status=JobStatus.pending)
     db.add(job)
     db.commit()
     db.refresh(job)
@@ -289,3 +205,11 @@ def create_job_record(url: str, db: Session) -> Job:
 def enqueue_job(job: Job):
     loop = asyncio.get_event_loop()
     loop.create_task(run_job(job.id, job.url, SessionLocal))
+
+
+def _persist_task_id(db: Session, job_id: str, task_id: str):
+    job = db.query(Job).get(job_id)
+    if not job:
+        return
+    job.bailian_task_id = task_id
+    db.commit()

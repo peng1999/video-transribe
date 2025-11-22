@@ -12,6 +12,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import inspect, text
 
 from .db import Base, engine, get_db, SessionLocal
 from .models import Job, JobStatus
@@ -20,11 +21,11 @@ from .worker import (
     create_job_record,
     enqueue_job,
     broadcast,
-    stream_formatting,
     register_queue,
     unregister_queue,
     latest_payload,
 )
+from .providers import stream_formatting
 
 
 load_dotenv()
@@ -39,6 +40,25 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_job_columns():
+    inspector = inspect(engine)
+    cols = {col["name"] for col in inspector.get_columns("jobs")}
+    statements: list[str] = []
+    if "provider" not in cols:
+        statements.append(
+            "ALTER TABLE jobs ADD COLUMN provider VARCHAR DEFAULT 'openai' NOT NULL"
+        )
+    if "bailian_task_id" not in cols:
+        statements.append("ALTER TABLE jobs ADD COLUMN bailian_task_id VARCHAR")
+    if statements:
+        with engine.begin() as conn:
+            for stmt in statements:
+                conn.execute(text(stmt))
+
+
+_ensure_job_columns()
 
 app = FastAPI(title="Bilibili Transcriber", version="0.1.0")
 
@@ -65,7 +85,7 @@ async def create_job(
     if not cf_email or cf_email not in ALLOWED_CF_EMAILS:
         raise HTTPException(status_code=403, detail="仅允许管理员创建请求")
 
-    job = create_job_record(str(body.url), db)
+    job = create_job_record(str(body.url), body.provider, db)
     enqueue_job(job)
     return job
 
@@ -112,7 +132,7 @@ async def regenerate_formatted_text(job_id: str, db: Session = Depends(get_db)):
             if not job_task:
                 broadcast(job_id, {"stage": JobStatus.error, "error": "任务不存在"})
                 return
-            formatted = await stream_formatting(job.raw_text or "", job_id)
+            formatted = await stream_formatting(job.raw_text or "", job_id, broadcast)
             job_task.formatted_text = formatted
             job_task.status = JobStatus.done
             db_task.commit()

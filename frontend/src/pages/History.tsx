@@ -36,6 +36,9 @@ export default function History() {
                 <Text size="sm" c="dimmed">
                   创建时间：{new Date(job.created_at).toLocaleString()}
                 </Text>
+                <Text size="sm" c="dimmed">
+                  提供方：{job.provider === "bailian" ? "阿里百炼" : "OpenAI"}
+                </Text>
               </div>
               <Badge
                 color={

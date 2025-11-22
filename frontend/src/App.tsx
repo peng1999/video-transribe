@@ -10,6 +10,7 @@ import {
   Grid,
   Group,
   Loader,
+  Select,
   Stack,
   Text,
   TextInput,
@@ -22,6 +23,7 @@ import {
   JobStage,
   getJob,
   regenerateJob,
+  Provider,
 } from "./api";
 
 interface ProgressEvent {
@@ -65,6 +67,7 @@ function StageBadge({ active }: { active: boolean }) {
 export default function App() {
   const [url, setUrl] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
+  const [provider, setProvider] = useState<Provider>("openai");
   const [stage, setStage] = useState<JobStage | "pending">("pending");
   const [wordCount, setWordCount] = useState(0);
   const [formatted, setFormatted] = useState("");
@@ -139,7 +142,7 @@ export default function App() {
     e.preventDefault();
     resetView();
     try {
-      const job = await createJob(url);
+      const job = await createJob(url, provider);
       setJobId(job.id);
       setStage("downloading");
       stageRef.current = "downloading";
@@ -154,6 +157,7 @@ export default function App() {
     setJobId(id);
     try {
       const job = await getJob(id);
+      setProvider(job.provider as Provider);
       setStage(job.status);
       stageRef.current = job.status;
       setRaw(job.raw_text || "");
@@ -181,6 +185,13 @@ export default function App() {
     () => Object.fromEntries(stages.map((s) => [s.key, s.label])),
     [],
   );
+
+  const providerBadge = useMemo(() => {
+    if (provider === "bailian") {
+      return "阿里百炼 qwen3-asr-flash-filetrans + DeepSeek";
+    }
+    return "OpenAI gpt-4o-mini-transcribe + DeepSeek";
+  }, [provider]);
 
   const isProcessing =
     stage === "downloading" ||
@@ -216,7 +227,7 @@ export default function App() {
             <Group justify="space-between" align="flex-end">
               <Title order={3}>Bilibili 文字转录</Title>
               <Badge color="blue" variant="light">
-                gpt-4o-mini-transcribe + DeepSeek
+                {providerBadge}
               </Badge>
             </Group>
             <TextInput
@@ -226,6 +237,18 @@ export default function App() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               required
+            />
+            <Select
+              label="后端提供方"
+              data={[
+                { value: "openai", label: "OpenAI gpt-4o-mini-transcribe" },
+                {
+                  value: "bailian",
+                  label: "阿里百炼 qwen3-asr-flash-filetrans",
+                },
+              ]}
+              value={provider}
+              onChange={(value) => setProvider((value as Provider) || "openai")}
             />
             <Group justify="flex-end">
               <Button type="submit">开始</Button>
@@ -249,6 +272,10 @@ export default function App() {
                   任务 ID
                 </Text>
                 <Text fw={600}>{jobId}</Text>
+                <Text size="sm" c="dimmed">
+                  提供方：{provider === "bailian" ? "阿里百炼" : "OpenAI"}
+                  （转录后统一用 DeepSeek 整理）
+                </Text>
               </div>
               <Group gap="xs" align="flex-start">
                 <Button

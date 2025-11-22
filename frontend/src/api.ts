@@ -10,9 +10,12 @@ export type JobStage =
   | "done"
   | "error";
 
+export type Provider = "openai" | "bailian";
+
 export interface Job {
   id: string;
   url: string;
+  provider: Provider;
   status: JobStage;
   raw_text?: string;
   formatted_text?: string;
@@ -21,8 +24,8 @@ export interface Job {
   updated_at: string;
 }
 
-export async function createJob(url: string) {
-  const res = await api.post<Job>("/jobs", { url });
+export async function createJob(url: string, provider: Provider) {
+  const res = await api.post<Job>("/jobs", { url, provider });
   return res.data;
 }
 

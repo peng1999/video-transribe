@@ -13,6 +13,8 @@ dependencies = [
     "yt-dlp",
     "openai>=1.56.0",
     "python-multipart",
+    "httpx",
+    "oss2",
 ]
 
 [tool.uv]
