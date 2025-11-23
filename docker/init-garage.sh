@@ -42,8 +42,8 @@ ensure_layout() {
     exit 1
   fi
   if echo "$status_clean" | grep -Eq "NO ROLE ASSIGNED|pending"; then
-    log "Assigning single-node layout (node $node_id, zone 1, capacity 1024)..."
-    compose_exec /garage layout assign --capacity 1024 --zone 1 "$node_id"
+    log "Assigning single-node layout (node $node_id, zone garage, capacity 1G)..."
+    compose_exec /garage layout assign --capacity 1G --zone garage "$node_id"
   fi
   if echo "$status_clean" | grep -Eq "NO ROLE ASSIGNED|pending"; then
     layout_show="$(compose_exec /garage layout show)"

@@ -82,7 +82,8 @@ async def create_job(
     cf_email = request.headers.get("Cf-Access-Authenticated-User-Email")
     logging.info("create_job by CF user: %s", cf_email)
 
-    if not cf_email or cf_email not in ALLOWED_CF_EMAILS:
+    dev_mode = os.environ.get("DEV_MODE", "0") == "1"
+    if not (dev_mode or cf_email in ALLOWED_CF_EMAILS):
         raise HTTPException(status_code=403, detail="仅允许管理员创建请求")
 
     job = create_job_record(str(body.url), body.provider, db)
