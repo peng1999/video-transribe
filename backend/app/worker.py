@@ -68,6 +68,10 @@ async def run_job(job_id: str, url: str, db_factory: Callable[[], Session]):
 
 
 async def _run(job: Job, url: str, db: Session):
+    # helper to adapt provider callbacks (payload-only) to our broadcaster
+    def _progress(payload: dict):
+        broadcast(job.id, payload)
+
     job.status = JobStatus.downloading
     db.commit()
     logging.info("job %s started, url=%s", job.id, url)
@@ -103,11 +107,11 @@ async def _run(job: Job, url: str, db: Session):
         raw_text = await transcribe_with_bailian(
             audio_path,
             job.id,
-            broadcast,
+            on_progress=_progress,
             on_task_id=lambda task_id: _persist_task_id(db, job.id, task_id),
         )
     else:
-        raw_text = await transcribe_with_openai(audio_path, job.id, broadcast)
+        raw_text = await transcribe_with_openai(audio_path, job.id, _progress)
     job.raw_text = raw_text
     logging.info("job %s transcription done, length=%d", job.id, len(raw_text))
 
@@ -115,7 +119,7 @@ async def _run(job: Job, url: str, db: Session):
     db.commit()
     broadcast(job.id, {"stage": JobStatus.formatting, "message": "Formatting"})
 
-    formatted = await stream_formatting(raw_text, job.id, broadcast)
+    formatted = await stream_formatting(raw_text, job.id, _progress)
     job.formatted_text = formatted
     logging.info("job %s formatting done, length=%d", job.id, len(formatted))
 

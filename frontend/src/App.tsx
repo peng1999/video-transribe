@@ -67,7 +67,7 @@ function StageBadge({ active }: { active: boolean }) {
 export default function App() {
   const [url, setUrl] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
-  const [provider, setProvider] = useState<Provider>("openai");
+  const [provider, setProvider] = useState<Provider>("bailian");
   const [stage, setStage] = useState<JobStage | "pending">("pending");
   const [wordCount, setWordCount] = useState(0);
   const [formatted, setFormatted] = useState("");
@@ -241,11 +241,11 @@ export default function App() {
             <Select
               label="后端提供方"
               data={[
-                { value: "openai", label: "OpenAI gpt-4o-mini-transcribe" },
                 {
                   value: "bailian",
                   label: "阿里百炼 qwen3-asr-flash-filetrans",
                 },
+                { value: "openai", label: "OpenAI gpt-4o-mini-transcribe" },
               ]}
               value={provider}
               onChange={(value) => setProvider((value as Provider) || "openai")}

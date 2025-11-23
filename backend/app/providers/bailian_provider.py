@@ -57,12 +57,10 @@ async def _fetch_task(client: httpx.AsyncClient, task_id: str) -> dict:
 
 
 def _extract_result_url(task_payload: dict) -> Optional[str]:
-    output = task_payload.get("output", task_payload)
-    results = output.get("results") or []
-    if not results:
+    result = task_payload.get("result")
+    if not result:
         return None
-    first = results[0]
-    return first.get("transcription_url") or first.get("url")
+    return result.get("transcription_url")
 
 
 async def _download_transcription(client: httpx.AsyncClient, url: str) -> str:
@@ -97,6 +95,7 @@ async def transcribe(
     )
     async with httpx.AsyncClient(timeout=60) as client:
         task_id = await _submit_task(client, file_url)
+        logging.info("job %s submitted bailian task %s", job_id, task_id)
         on_task_id(task_id)
         on_progress(
             {
@@ -109,6 +108,7 @@ async def transcribe(
             task_payload = await _fetch_task(client, task_id)
             output = task_payload.get("output", task_payload)
             status = output.get("task_status")
+            logging.info("job %s bailian task %s status=%s", job_id, task_id, status)
             if status in {"RUNNING", "PENDING"}:
                 on_progress(
                     {
@@ -121,6 +121,12 @@ async def transcribe(
                 error_msg = output.get("message") or "Bailian task failed"
                 raise RuntimeError(error_msg)
             if status == "SUCCEEDED":
+                logging.info(
+                    "job %s bailian task %s succeeded, payload=%s",
+                    job_id,
+                    task_id,
+                    output,
+                )
                 url = _extract_result_url(task_payload)
                 if not url:
                     raise RuntimeError("transcription_url 缺失")

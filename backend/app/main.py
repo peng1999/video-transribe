@@ -128,12 +128,17 @@ async def regenerate_formatted_text(job_id: str, db: Session = Depends(get_db)):
 
     async def _regenerate():
         db_task = SessionLocal()
+
+        # adapt provider-style progress callbacks (payload only)
+        def _progress(payload: dict):
+            broadcast(job_id, payload)
+
         try:
             job_task = db_task.query(Job).get(job_id)
             if not job_task:
                 broadcast(job_id, {"stage": JobStatus.error, "error": "任务不存在"})
                 return
-            formatted = await stream_formatting(job.raw_text or "", job_id, broadcast)
+            formatted = await stream_formatting(job.raw_text or "", job_id, _progress)
             job_task.formatted_text = formatted
             job_task.status = JobStatus.done
             db_task.commit()
