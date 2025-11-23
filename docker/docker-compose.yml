@@ -1,12 +1,4 @@
 services:
-  garage:
-    image: dxflrs/garage:v2.1.0
-    environment:
-      - RUST_LOG=info
-    volumes:
-      - ./garage_data:/var/lib/garage
-      - ./garage.toml:/etc/garage.toml:ro
-
   backend:
     build:
       context: ../

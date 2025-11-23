@@ -17,8 +17,8 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 DASHSCOPE_API_KEY=...                # 阿里百炼
 # S3 兼容存储（Garage 或 OSS/S3），path-style
-S3_ENDPOINT=http://localhost:8021/s3
-S3_PUBLIC_ENDPOINT=http://your-public-domain/s3   # 百炼访问用的公网可达地址
+S3_ENDPOINT=http://localhost:8021/
+S3_PUBLIC_ENDPOINT=http://your-public-domain/
 S3_REGION=garage
 S3_BUCKET=transcribe
 AWS_ACCESS_KEY_ID=...
@@ -76,9 +76,9 @@ Vite dev server 通过代理将 `/api` 指向 `http://localhost:8000`，WebSocke
   docker compose up -d garage
   ./init-garage.sh          # 首次生成 bucket 与访问密钥
   ```
-- 脚本会输出 `AWS_ACCESS_KEY_ID/SECRET`, `S3_ENDPOINT=http://localhost:3900`, `S3_BUCKET=transcribe`，可供后端或其他工具使用。
+- 脚本会输出 `AWS_ACCESS_KEY_ID/SECRET`, `S3_BUCKET=transcribe`，可供后端使用；`S3_ENDPOINT` 由前端域名的 `/s3/` 反代提供。
 - Garage 配置在 `docker/garage.toml`，默认 `rpc_secret` 与 `admin_token` 请按需修改后再启动。若已启动需 `docker compose restart garage` 生效。
-- 端口策略：Garage 不暴露外部端口；Nginx 将 `/s3/` 代理到 `garage:3900` 供内网/前端使用。后端 `S3_ENDPOINT` 可设为 `http://<前端域名>/s3`（path-style）。
+- 端口策略：Garage 不暴露外部端口；Nginx 将同域 `/s3/` 代理到 `garage:3900`，签名时需包含 `/s3` 前缀。
 
 # TODO
 - 优化移动端显示
