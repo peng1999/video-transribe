@@ -52,6 +52,10 @@ def _ensure_job_columns():
         )
     if "bailian_task_id" not in cols:
         statements.append("ALTER TABLE jobs ADD COLUMN bailian_task_id VARCHAR")
+    if "model" not in cols:
+        statements.append(
+            "ALTER TABLE jobs ADD COLUMN model VARCHAR DEFAULT 'qwen3-asr-flash-filetrans'"
+        )
     if statements:
         with engine.begin() as conn:
             for stmt in statements:
@@ -86,7 +90,7 @@ async def create_job(
     if not (dev_mode or cf_email in ALLOWED_CF_EMAILS):
         raise HTTPException(status_code=403, detail="仅允许管理员创建请求")
 
-    job = create_job_record(str(body.url), body.provider, db)
+    job = create_job_record(str(body.url), body.provider, db, model=body.model)
     enqueue_job(job)
     return job
 

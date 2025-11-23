@@ -12,6 +12,8 @@ from .oss_storage import upload_audio_and_sign_url, OSSConfigError
 
 DASHSCOPE_BASE = "https://dashscope.aliyuncs.com/api/v1"
 FILETRANS_MODEL = "qwen3-asr-flash-filetrans"
+FUN_ASR_MODEL = "fun-asr"
+DEFAULT_BAILIAN_MODEL = FILETRANS_MODEL
 
 
 class BailianConfigError(RuntimeError):
@@ -25,16 +27,24 @@ def _get_api_key() -> str:
     return api_key
 
 
-async def _submit_task(client: httpx.AsyncClient, file_url: str) -> str:
+async def _submit_task(
+    client: httpx.AsyncClient, file_url: str, model: str = DEFAULT_BAILIAN_MODEL
+) -> str:
     headers = {
         "Authorization": f"Bearer {_get_api_key()}",
         "X-DashScope-Async": "enable",
     }
-    payload = {
-        "model": FILETRANS_MODEL,
-        "input": {"file_url": file_url},
-        "parameters": {"language": "zh", "enable_itn": True},
-    }
+    if model == FUN_ASR_MODEL:
+        payload = {
+            "model": FUN_ASR_MODEL,
+            "input": {"file_urls": [file_url]},
+        }
+    else:
+        payload = {
+            "model": model,
+            "input": {"file_url": file_url},
+            "parameters": {"language": "zh", "enable_itn": True},
+        }
     resp = await client.post(
         f"{DASHSCOPE_BASE}/services/audio/asr/transcription",
         json=payload,
@@ -80,6 +90,7 @@ async def transcribe(
     job_id: str,
     on_progress: Callable[[dict], None],
     on_task_id: Callable[[str], None],
+    model: str = DEFAULT_BAILIAN_MODEL,
 ) -> str:
     """Submit async ASR to Bailian and poll until completion."""
     try:
@@ -94,13 +105,18 @@ async def transcribe(
         }
     )
     async with httpx.AsyncClient(timeout=60) as client:
-        task_id = await _submit_task(client, file_url)
-        logging.info("job %s submitted bailian task %s", job_id, task_id)
+        task_id = await _submit_task(client, file_url, model)
+        logging.info(
+            "job %s submitted bailian task %s using model %s",
+            job_id,
+            task_id,
+            model,
+        )
         on_task_id(task_id)
         on_progress(
             {
                 "stage": JobStatus.transcribing,
-                "message": f"百炼任务已提交，task_id={task_id}",
+                "message": f"百炼任务已提交（{model}），task_id={task_id}",
             }
         )
         while True:

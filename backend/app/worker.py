@@ -18,6 +18,7 @@ from .providers import (
     transcribe_with_openai,
     transcribe_with_bailian,
     stream_formatting,
+    DEFAULT_BAILIAN_MODEL,
 )
 
 # simple in-memory subscriber queues per job for WebSocket streaming
@@ -104,11 +105,13 @@ async def _run(job: Job, url: str, db: Session):
 
     provider = job.provider or "openai"
     if provider == "bailian":
+        bailian_model = job.model or DEFAULT_BAILIAN_MODEL
         raw_text = await transcribe_with_bailian(
             audio_path,
             job.id,
             on_progress=_progress,
             on_task_id=lambda task_id: _persist_task_id(db, job.id, task_id),
+            model=bailian_model,
         )
     else:
         raw_text = await transcribe_with_openai(audio_path, job.id, _progress)
@@ -192,12 +195,18 @@ def get_cache_path(url: str) -> Path:
     return cache_dir / f"{hashed}.mp3"
 
 
-def create_job_record(url: str, provider: str, db: Session) -> Job:
+def create_job_record(
+    url: str, provider: str, db: Session, model: str | None = None
+) -> Job:
     chosen_provider = provider or os.getenv("DEFAULT_PROVIDER", "openai")
+    chosen_model = model
+    if chosen_provider == "bailian":
+        chosen_model = model or DEFAULT_BAILIAN_MODEL
     job = Job(
         id=str(uuid.uuid4()),
         url=url,
         provider=chosen_provider,
+        model=chosen_model,
         status=JobStatus.pending,
     )
     db.add(job)

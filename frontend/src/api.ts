@@ -11,11 +11,13 @@ export type JobStage =
   | "error";
 
 export type Provider = "openai" | "bailian";
+export type BailianModel = "qwen3-asr-flash-filetrans" | "fun-asr";
 
 export interface Job {
   id: string;
   url: string;
   provider: Provider;
+  model?: BailianModel | string;
   status: JobStage;
   raw_text?: string;
   formatted_text?: string;
@@ -24,8 +26,17 @@ export interface Job {
   updated_at: string;
 }
 
-export async function createJob(url: string, provider: Provider) {
-  const res = await api.post<Job>("/jobs", { url, provider });
+export async function createJob(
+  url: string,
+  provider: Provider,
+  model?: BailianModel,
+) {
+  const payload: { url: string; provider: Provider; model?: BailianModel } = {
+    url,
+    provider,
+  };
+  if (model) payload.model = model;
+  const res = await api.post<Job>("/jobs", payload);
   return res.data;
 }
 

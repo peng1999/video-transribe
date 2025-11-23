@@ -19,6 +19,7 @@ class Job(Base):
     id = Column(String, primary_key=True, index=True)
     url = Column(String, nullable=False)
     provider = Column(String, default="openai", nullable=False)
+    model = Column(String, nullable=True)
     bailian_task_id = Column(String, nullable=True)
     status = Column(Enum(JobStatus), default=JobStatus.pending, nullable=False)
     raw_text = Column(Text, nullable=True)

@@ -1,8 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   Alert,
-  Anchor,
   Badge,
   Button,
   Card,
@@ -24,6 +23,7 @@ import {
   getJob,
   regenerateJob,
   Provider,
+  BailianModel,
 } from "./api";
 
 interface ProgressEvent {
@@ -49,6 +49,24 @@ const stages: DisplayStage[] = [
   { key: "error", label: "失败" },
 ];
 
+type ProviderOptionValue = "bailian-qwen3" | "bailian-fun-asr" | "openai";
+type ProviderOption = {
+  value: ProviderOptionValue;
+  provider: Provider;
+  model?: BailianModel;
+  label: string;
+  badge: string;
+};
+
+function getSavedSelection(): ProviderOptionValue {
+  if (typeof window === "undefined") return "bailian-qwen3";
+  const saved = window.localStorage.getItem("providerSelection");
+  if (saved === "bailian-fun-asr" || saved === "openai" || saved === "bailian-qwen3") {
+    return saved;
+  }
+  return "bailian-qwen3";
+}
+
 function StageBadge({ active }: { active: boolean }) {
   return (
     <span
@@ -67,7 +85,13 @@ function StageBadge({ active }: { active: boolean }) {
 export default function App() {
   const [url, setUrl] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
-  const [provider, setProvider] = useState<Provider>("bailian");
+  const [selectedValue, setSelectedValue] = useState<ProviderOptionValue>(() =>
+    getSavedSelection(),
+  );
+  const [provider, setProvider] = useState<Provider>(() => {
+    const sel = getSavedSelection();
+    return sel === "openai" ? "openai" : "bailian";
+  });
   const [stage, setStage] = useState<JobStage | "pending">("pending");
   const [wordCount, setWordCount] = useState(0);
   const [formatted, setFormatted] = useState("");
@@ -142,8 +166,17 @@ export default function App() {
     e.preventDefault();
     resetView();
     try {
-      const job = await createJob(url, provider);
+      setProvider(selectedOption.provider);
+      const job = await createJob(
+        url,
+        selectedOption.provider,
+        selectedOption.model,
+      );
       setJobId(job.id);
+      setProvider(job.provider as Provider);
+      setSelectedValue(
+        deriveOptionValue(job.provider as Provider, job.model as BailianModel | undefined),
+      );
       setStage("downloading");
       stageRef.current = "downloading";
       connectWebSocket(job.id);
@@ -158,6 +191,9 @@ export default function App() {
     try {
       const job = await getJob(id);
       setProvider(job.provider as Provider);
+      setSelectedValue(
+        deriveOptionValue(job.provider as Provider, job.model as BailianModel | undefined),
+      );
       setStage(job.status);
       stageRef.current = job.status;
       setRaw(job.raw_text || "");
@@ -186,12 +222,52 @@ export default function App() {
     [],
   );
 
-  const providerBadge = useMemo(() => {
-    if (provider === "bailian") {
-      return "阿里百炼 qwen3-asr-flash-filetrans + DeepSeek";
+  const providerOptions: ProviderOption[] = [
+    {
+      value: "bailian-qwen3",
+      provider: "bailian",
+      model: "qwen3-asr-flash-filetrans",
+      label: "阿里百炼 qwen3-asr-flash-filetrans",
+      badge: "阿里百炼 qwen3-asr-flash-filetrans + DeepSeek",
+    },
+    {
+      value: "bailian-fun-asr",
+      provider: "bailian",
+      model: "fun-asr",
+      label: "阿里百炼 fun-asr",
+      badge: "阿里百炼 fun-asr + DeepSeek",
+    },
+    {
+      value: "openai",
+      provider: "openai",
+      label: "OpenAI gpt-4o-mini-transcribe",
+      badge: "OpenAI gpt-4o-mini-transcribe + DeepSeek",
+    },
+  ];
+
+  const selectedOption = useMemo(
+    () => providerOptions.find((opt) => opt.value === selectedValue) || providerOptions[0],
+    [selectedValue, providerOptions],
+  );
+
+  const providerBadge = selectedOption.badge;
+
+  function deriveOptionValue(
+    p: Provider,
+    model?: BailianModel,
+  ): ProviderOptionValue {
+    if (p === "bailian") {
+      if (model === "fun-asr") return "bailian-fun-asr";
+      return "bailian-qwen3";
     }
-    return "OpenAI gpt-4o-mini-transcribe + DeepSeek";
-  }, [provider]);
+    return "openai";
+  }
+
+  // persist provider choice for refresh
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("providerSelection", selectedValue);
+  }, [selectedValue]);
 
   const isProcessing =
     stage === "downloading" ||
@@ -240,15 +316,19 @@ export default function App() {
             />
             <Select
               label="后端提供方"
-              data={[
-                {
-                  value: "bailian",
-                  label: "阿里百炼 qwen3-asr-flash-filetrans",
-                },
-                { value: "openai", label: "OpenAI gpt-4o-mini-transcribe" },
-              ]}
-              value={provider}
-              onChange={(value) => setProvider((value as Provider) || "openai")}
+              data={providerOptions.map((opt) => ({
+                value: opt.value,
+                label: opt.label,
+              }))}
+              value={selectedValue}
+              onChange={(value) => {
+                const next = (value as ProviderOptionValue) || "bailian-qwen3";
+                setSelectedValue(next);
+                const opt =
+                  providerOptions.find((item) => item.value === next) ||
+                  providerOptions[0];
+                setProvider(opt.provider);
+              }}
             />
             <Group justify="flex-end">
               <Button type="submit">开始</Button>
@@ -273,7 +353,7 @@ export default function App() {
                 </Text>
                 <Text fw={600}>{jobId}</Text>
                 <Text size="sm" c="dimmed">
-                  提供方：{provider === "bailian" ? "阿里百炼" : "OpenAI"}
+                  提供方：{selectedOption.label}
                   （转录后统一用 DeepSeek 整理）
                 </Text>
               </div>

@@ -10,12 +10,16 @@ class CreateJobRequest(BaseModel):
     provider: Literal["openai", "bailian"] = Field(
         default="openai", description="ASR provider to use"
     )
+    model: Optional[Literal["qwen3-asr-flash-filetrans", "fun-asr"]] = Field(
+        default=None, description="ASR model when provider is bailian"
+    )
 
 
 class JobResponse(BaseModel):
     id: str
     url: str
     provider: str
+    model: Optional[str] = None
     status: JobStatus
     raw_text: Optional[str] = None
     formatted_text: Optional[str] = None
