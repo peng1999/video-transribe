@@ -67,10 +67,44 @@ async def _fetch_task(client: httpx.AsyncClient, task_id: str) -> dict:
 
 
 def _extract_result_url(task_payload: dict) -> Optional[str]:
+    output = task_payload.get("output", task_payload)
+    results = output.get("results")
+    if isinstance(results, list):
+        for item in results:
+            if item.get("subtask_status") == "SUCCEEDED" and item.get(
+                "transcription_url"
+            ):
+                return item["transcription_url"]
+        for item in results:
+            if item.get("transcription_url"):
+                return item["transcription_url"]
+
+    # Backward-compatible fallback for any older payload shape.
     result = task_payload.get("result")
-    if not result:
-        return None
-    return result.get("transcription_url")
+    if isinstance(result, dict):
+        return result.get("transcription_url")
+    return None
+
+
+def _extract_transcription_text(data: dict) -> str | None:
+    for key in ("transcription", "text", "result", "transcript"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+
+    transcripts = data.get("transcripts")
+    if isinstance(transcripts, list):
+        parts: list[str] = []
+        for item in transcripts:
+            if not isinstance(item, dict):
+                continue
+            text = item.get("text") or item.get("transcript")
+            if isinstance(text, str) and text.strip():
+                parts.append(text.strip())
+        if parts:
+            return "\n".join(parts)
+
+    return None
 
 
 async def _download_transcription(client: httpx.AsyncClient, url: str) -> str:
@@ -79,9 +113,9 @@ async def _download_transcription(client: httpx.AsyncClient, url: str) -> str:
     content_type = resp.headers.get("content-type", "")
     if "application/json" in content_type:
         data = resp.json()
-        for key in ("transcription", "text", "result"):
-            if key in data:
-                return data[key]
+        extracted = _extract_transcription_text(data)
+        if extracted:
+            return extracted
     return resp.text
 
 

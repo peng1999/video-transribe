@@ -10,10 +10,10 @@ class OSSConfigError(RuntimeError):
     pass
 
 
-def _get_client():
+def _get_client(endpoint_override: str | None = None):
     access_key = os.getenv("AWS_ACCESS_KEY_ID")
     access_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
-    endpoint = os.getenv("S3_ENDPOINT")
+    endpoint = endpoint_override or os.getenv("S3_PUBLIC_ENDPOINT")
     region = os.getenv("S3_REGION", "garage")
     if not all([access_key, access_secret, endpoint]):
         raise OSSConfigError("S3 credentials/endpoint are required")
@@ -40,24 +40,11 @@ def upload_audio_and_sign_url(audio_path: Path, job_id: str) -> str:
     client.upload_file(str(audio_path), bucket, object_name)
 
     expires = int(os.getenv("S3_SIGN_EXPIRE_SECONDS", "3600"))
-    presigned = client.generate_presigned_url(
+    public_endpoint = os.getenv("S3_PUBLIC_ENDPOINT")
+    presign_client = _get_client(public_endpoint) if public_endpoint else client
+    presigned = presign_client.generate_presigned_url(
         "get_object",
         Params={"Bucket": bucket, "Key": object_name},
         ExpiresIn=expires,
     )
-    public_endpoint = os.getenv("S3_PUBLIC_ENDPOINT")
-    if public_endpoint:
-        from urllib.parse import urlsplit, urlunsplit
-
-        pe = urlsplit(public_endpoint)
-        pu = urlsplit(presigned)
-        presigned = urlunsplit(
-            (
-                pe.scheme or pu.scheme,
-                pe.netloc or pu.netloc,
-                pu.path,
-                pu.query,
-                pu.fragment,
-            )
-        )
     return presigned
