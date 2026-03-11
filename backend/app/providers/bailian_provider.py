@@ -1,6 +1,9 @@
 import asyncio
+import json
 import logging
 import os
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -14,6 +17,8 @@ DASHSCOPE_BASE = "https://dashscope.aliyuncs.com/api/v1"
 FILETRANS_MODEL = "qwen3-asr-flash-filetrans"
 FUN_ASR_MODEL = "fun-asr"
 DEFAULT_BAILIAN_MODEL = FILETRANS_MODEL
+DEFAULT_CHUNK_SECONDS = int(os.getenv("BAILIAN_CHUNK_SECONDS", "300"))
+DEFAULT_CHUNK_OVERLAP_SECONDS = int(os.getenv("BAILIAN_CHUNK_OVERLAP_SECONDS", "15"))
 
 
 class BailianConfigError(RuntimeError):
@@ -119,38 +124,111 @@ async def _download_transcription(client: httpx.AsyncClient, url: str) -> str:
     return resp.text
 
 
-async def transcribe(
+def _format_seconds(value: float) -> str:
+    total = max(0, int(round(value)))
+    hours, rem = divmod(total, 3600)
+    minutes, seconds = divmod(rem, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _probe_duration(audio_path: Path) -> float:
+    proc = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "json",
+            str(audio_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(proc.stdout or "{}")
+    duration = payload.get("format", {}).get("duration")
+    if duration is None:
+        raise RuntimeError(f"failed to probe duration for {audio_path}")
+    return float(duration)
+
+
+def _split_audio(audio_path: Path, workdir: Path) -> list[tuple[Path, float, float]]:
+    duration = _probe_duration(audio_path)
+    chunk_seconds = max(1, DEFAULT_CHUNK_SECONDS)
+    overlap_seconds = max(0, min(DEFAULT_CHUNK_OVERLAP_SECONDS, chunk_seconds - 1))
+    if duration <= chunk_seconds:
+        return [(audio_path, 0.0, duration)]
+
+    segments: list[tuple[Path, float, float]] = []
+    start = 0.0
+    index = 1
+    while start < duration:
+        end = min(duration, start + chunk_seconds)
+        output = workdir / f"{audio_path.stem}-part-{index:03d}{audio_path.suffix}"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-ss",
+                f"{start:.3f}",
+                "-t",
+                f"{end - start:.3f}",
+                "-i",
+                str(audio_path),
+                "-vn",
+                "-acodec",
+                "copy",
+                str(output),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        segments.append((output, start, end))
+        if end >= duration:
+            break
+        start = max(0.0, end - overlap_seconds)
+        index += 1
+
+    return segments
+
+
+async def _transcribe_single_file(
     audio_path: Path,
     job_id: str,
     on_progress: Callable[[dict], None],
     on_task_id: Callable[[str], None],
-    model: str = DEFAULT_BAILIAN_MODEL,
+    model: str,
+    chunk_label: str | None = None,
 ) -> str:
-    """Submit async ASR to Bailian and poll until completion."""
     try:
-        file_url = upload_audio_and_sign_url(audio_path, job_id)
+        file_url = await asyncio.to_thread(upload_audio_and_sign_url, audio_path, job_id)
     except OSSConfigError as exc:
         raise BailianConfigError(str(exc)) from exc
 
+    prefix = f"{chunk_label}：" if chunk_label else ""
     on_progress(
         {
             "stage": JobStatus.transcribing,
-            "message": "已上传 OSS，提交百炼任务",
+            "message": f"{prefix}已上传 OSS，提交百炼任务",
         }
     )
     async with httpx.AsyncClient(timeout=60) as client:
         task_id = await _submit_task(client, file_url, model)
         logging.info(
-            "job %s submitted bailian task %s using model %s",
+            "job %s submitted bailian task %s using model %s chunk=%s",
             job_id,
             task_id,
             model,
+            chunk_label,
         )
         on_task_id(task_id)
         on_progress(
             {
                 "stage": JobStatus.transcribing,
-                "message": f"百炼任务已提交（{model}），task_id={task_id}",
+                "message": f"{prefix}百炼任务已提交（{model}），task_id={task_id}",
             }
         )
         while True:
@@ -158,12 +236,18 @@ async def transcribe(
             task_payload = await _fetch_task(client, task_id)
             output = task_payload.get("output", task_payload)
             status = output.get("task_status")
-            logging.info("job %s bailian task %s status=%s", job_id, task_id, status)
+            logging.info(
+                "job %s bailian task %s status=%s chunk=%s",
+                job_id,
+                task_id,
+                status,
+                chunk_label,
+            )
             if status in {"RUNNING", "PENDING"}:
                 on_progress(
                     {
                         "stage": JobStatus.transcribing,
-                        "message": f"百炼处理中（{status}）",
+                        "message": f"{prefix}百炼处理中（{status}）",
                     }
                 )
                 continue
@@ -172,22 +256,95 @@ async def transcribe(
                 raise RuntimeError(error_msg)
             if status == "SUCCEEDED":
                 logging.info(
-                    "job %s bailian task %s succeeded, payload=%s",
+                    "job %s bailian task %s succeeded, payload=%s chunk=%s",
                     job_id,
                     task_id,
                     output,
+                    chunk_label,
                 )
                 url = _extract_result_url(task_payload)
                 if not url:
                     raise RuntimeError("transcription_url 缺失")
-                text = await _download_transcription(client, url)
-                on_progress(
-                    {
-                        "stage": JobStatus.transcribing,
-                        "raw_text": text,
-                        "words": len(text.split()),
-                        "message": "百炼转录完成",
-                    }
-                )
-                return text
+                return await _download_transcription(client, url)
             raise RuntimeError(f"Unknown bailian status: {status}")
+
+
+async def transcribe(
+    audio_path: Path,
+    job_id: str,
+    on_progress: Callable[[dict], None],
+    on_task_id: Callable[[str], None],
+    model: str = DEFAULT_BAILIAN_MODEL,
+) -> str:
+    """Split long audio into overlapping chunks, transcribe each, then merge."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        chunks = _split_audio(audio_path, Path(tmpdir))
+
+        logging.info(
+            "job %s split audio into %d chunks for Bailian model=%s",
+            job_id,
+            len(chunks),
+            model,
+        )
+        if len(chunks) > 1:
+            on_progress(
+                {
+                    "stage": JobStatus.transcribing,
+                    "message": (
+                        f"音频已按 {DEFAULT_CHUNK_SECONDS // 60} 分钟分片，"
+                        f"相邻重叠 {DEFAULT_CHUNK_OVERLAP_SECONDS} 秒，共 {len(chunks)} 片"
+                    ),
+                }
+            )
+
+        merged_sections: list[str | None] = [None] * len(chunks)
+
+        async def _transcribe_chunk(
+            index: int, chunk_path: Path, start: float, end: float
+        ) -> None:
+            label = (
+                f"第 {index}/{len(chunks)} 片 "
+                f"({_format_seconds(start)}-{_format_seconds(end)})"
+            )
+            try:
+                text = await _transcribe_single_file(
+                    chunk_path,
+                    f"{job_id}-chunk-{index:03d}",
+                    on_progress,
+                    on_task_id,
+                    model,
+                    chunk_label=label if len(chunks) > 1 else None,
+                )
+            except Exception as exc:
+                raise RuntimeError(f"{label} 转录失败：{exc}") from exc
+
+            if len(chunks) > 1:
+                merged_sections[index - 1] = (
+                    (
+                        f"[分片 {index}/{len(chunks)} | "
+                        f"时间 { _format_seconds(start)}-{_format_seconds(end)} | "
+                        f"与上一片重叠 {DEFAULT_CHUNK_OVERLAP_SECONDS if index > 1 else 0} 秒]\n"
+                        f"{text.strip()}"
+                    )
+                )
+            else:
+                merged_sections[index - 1] = text.strip()
+
+            merged_text = "\n\n".join(section for section in merged_sections if section)
+            on_progress(
+                {
+                    "stage": JobStatus.transcribing,
+                    "raw_text": merged_text,
+                    "words": len(merged_text.split()),
+                    "message": f"{label} 转录完成",
+                }
+            )
+
+        await asyncio.gather(
+            *[
+                _transcribe_chunk(index, chunk_path, start, end)
+                for index, (chunk_path, start, end) in enumerate(chunks, start=1)
+            ]
+        )
+
+        return "\n\n".join(section for section in merged_sections if section)
