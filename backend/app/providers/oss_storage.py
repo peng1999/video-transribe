@@ -14,7 +14,7 @@ def _get_client(endpoint_override: str | None = None):
     access_key = os.getenv("AWS_ACCESS_KEY_ID")
     access_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
     endpoint = endpoint_override or os.getenv("S3_PUBLIC_ENDPOINT")
-    region = os.getenv("S3_REGION", "garage")
+    region = os.getenv("S3_REGION", "auto")
     if not all([access_key, access_secret, endpoint]):
         raise OSSConfigError("S3 credentials/endpoint are required")
 

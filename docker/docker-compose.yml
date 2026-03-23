@@ -5,12 +5,10 @@ services:
       dockerfile: docker/Dockerfile
       target: backend
     env_file:
-      - .env
+      - ./.env
     volumes:
       - ./backend_cache:/app/backend/cache
       - ./backend_data/data.db:/app/backend/data.db
-    depends_on:
-      - garage
 
   frontend:
     build:

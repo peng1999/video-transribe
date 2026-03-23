@@ -9,20 +9,22 @@
 - Docker 镜像使用 `python:3.13-slim`（后端）与 `node:20-alpine`（前端构建）
 
 ## 配置
-复制 `backend/.env.example` 到 `backend/.env` 并填入密钥：
+本地运行时，复制 `backend/.env.example` 到 `backend/.env` 并填入密钥：
 ```
 OPENAI_API_KEY=...
 DEEPSEEK_API_KEY=...
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 DASHSCOPE_API_KEY=...                # 阿里百炼
-# S3 兼容存储（Garage 或 OSS/S3），path-style
-S3_PUBLIC_ENDPOINT=http://your-public-domain/
-S3_REGION=garage
+# S3 兼容存储（需要可被百炼公网访问）
+S3_PUBLIC_ENDPOINT=https://your-public-domain/
+S3_REGION=auto
 S3_BUCKET=transcribe
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 ```
+
+Docker 构建时，复制 `docker/.env.example` 到 `docker/.env`，再执行 `docker compose`。`docker/.env` 默认不提交到仓库。
 
 ## 后端运行（uv）
 ```bash
@@ -68,16 +70,17 @@ Vite dev server 通过代理将 `/api` 指向 `http://localhost:8000`，WebSocke
 - 临时文件在任务结束后会删除。
 - 已下载的音频会按 URL 哈希缓存在 `backend/cache/`，重复请求相同 URL 会复用；可通过 `AUDIO_CACHE_DIR` 自定义位置。
 
-## Docker + Garage（可选本地 S3）
-- 追加服务：`docker/docker-compose.yml` 中提供 Garage S3（镜像 `dxflrs/garage:v2.1.0`）。启动：
+## Docker
+- `docker/docker-compose.yml` 现在只保留应用本身：
+  - `backend`：FastAPI + uvicorn
+  - `frontend`：构建前端后由 nginx 提供静态文件，并把 `/api`、`/api/ws` 代理到 `backend`
+- 启动方式：
   ```bash
   cd docker
-  docker compose up -d garage
-  ./init-garage.sh          # 首次生成 bucket 与访问密钥
+  cp .env.example .env
+  docker compose up -d --build
   ```
-- 脚本会输出 `AWS_ACCESS_KEY_ID/SECRET`, `S3_BUCKET=transcribe` 与 `S3_PUBLIC_ENDPOINT`，可供后端直接使用。
-- Garage 配置在 `docker/garage.toml`，默认 `rpc_secret` 与 `admin_token` 请按需修改后再启动。若已启动需 `docker compose restart garage` 生效。
-- 端口策略：Garage 不暴露外部端口；Nginx 将同域 `/s3/` 代理到 `garage:3900`，签名时需包含 `/s3` 前缀。
+- `backend` 会读取 `docker/.env`。请提前准备好可用的外部 S3 兼容存储配置，确保 `S3_PUBLIC_ENDPOINT` 对百炼可访问。
 
 # TODO
 - 优化移动端显示
